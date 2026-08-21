@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Grok Web</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app" data-surface="idle" data-phases="">
+      <header class="mast">
+        <div class="mast-mark">
+          <span class="mast-dot" data-state="idle" id="conn-dot"></span>
+          <div>
+            <h1>Grok Web</h1>
+            <p class="mast-sub">ACP over <code>grok agent serve</code></p>
+          </div>
+        </div>
+        <div class="mast-meta">
+          <span id="conn-label">未连接</span>
+          <span class="session" id="session-label">无 session</span>
+          <span id="plan-badge" hidden></span>
+          <span id="version-badge"></span>
+        </div>
+      </header>
+
+      <section class="dock" aria-label="连接">
+        <label>
+          WebSocket
+          <input id="ws-url" spellcheck="false" autocomplete="off" />
+        </label>
+        <label>
+          Secret
+          <input id="secret" type="password" spellcheck="false" autocomplete="off" />
+        </label>
+        <label class="grow">
+          cwd
+          <input id="cwd" spellcheck="false" autocomplete="off" />
+        </label>
+        <div class="dock-actions">
+          <button id="btn-connect" type="button">连接</button>
+          <button id="btn-disconnect" type="button" disabled>断开</button>
+          <button id="btn-new" type="button" disabled>新会话</button>
+          <button id="btn-logout" type="button" hidden>退出登录</button>
+          <button id="btn-switch-account" type="button" hidden>切换账号</button>
+        </div>
+      </section>
+
+      <p class="banner" id="banner" hidden></p>
+      <p class="banner warn" id="startup-warnings" hidden></p>
+
+      <div class="stage">
+        <section class="surface" id="connecting" hidden>
+          <p class="connecting-copy" id="connecting-copy">正在连接本机 grok…</p>
+        </section>
+
+        <section class="surface doctor" id="doctor" hidden>
+          <h2>连接失败</h2>
+          <p id="doctor-copy"></p>
+          <button id="btn-doctor-retry" type="button">重试</button>
+        </section>
+
+        <section class="surface login" id="login" hidden>
+          <h2>登录</h2>
+          <p class="muted" id="login-hint">用本机 Agent 的鉴权方法登录。API key 不会写入 localStorage。</p>
+          <button id="btn-login-primary" type="button">grok.com</button>
+          <p class="muted" id="login-browser-hint" hidden>即将打开浏览器</p>
+          <label>
+            API key
+            <input
+              id="api-key"
+              type="password"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="xai-…"
+            />
+          </label>
+          <button id="btn-api-key" type="button">用 API key 登录</button>
+          <label>
+            授权码
+            <input id="auth-code" spellcheck="false" autocomplete="off" />
+          </label>
+          <button id="btn-submit-code" type="button">提交授权码</button>
+          <div id="authenticating" hidden>
+            <p class="connecting-copy">正在登录 <span id="auth-provider-name"></span>…</p>
+            <button id="btn-auth-cancel" type="button">取消</button>
+          </div>
+        </section>
+
+        <section class="surface welcome" id="welcome" hidden>
+          <p class="welcome-mark">Grok</p>
+          <h2>Welcome</h2>
+          <p class="welcome-cwd" id="welcome-cwd"></p>
+          <p class="muted" id="welcome-version"></p>
+          <div class="card" id="consent-banner" hidden>
+            <p>是否允许 xAI 保留 coding data 用于改进模型？ZDR/托管策略下可能不可改。</p>
+            <div class="row">
+              <button id="btn-consent-in" type="button">Opt in</button>
+              <button id="btn-consent-out" type="button">Opt out</button>
+            </div>
+          </div>
+          <div class="card paywall" id="paywall" hidden>
+            <p id="paywall-copy"></p>
+            <a id="paywall-link" href="https://grok.com" target="_blank" rel="noreferrer">grok.com</a>
+          </div>
+          <div class="card" id="workspace-ack" hidden>
+            <p>此会话会使用本机 local workspace。确认后再开 session。</p>
+            <button id="btn-workspace-ack" type="button">确认并继续</button>
+          </div>
+          <div class="card" id="trust-dialog" hidden>
+            <p id="trust-copy">首次在此文件夹运行。是否信任该 cwd？默认不自动 YOLO。</p>
+            <div class="row">
+              <button id="btn-trust-yes" type="button">信任</button>
+              <button id="btn-trust-no" type="button">不信任</button>
+            </div>
+          </div>
+          <div class="welcome-actions">
+            <button id="btn-continue" type="button" disabled>继续上次</button>
+            <button id="btn-welcome-new" type="button">新会话</button>
+            <button id="btn-worktree" type="button">新 worktree</button>
+            <button id="btn-import-claude" type="button" hidden>导入 Claude</button>
+          </div>
+        </section>
+
+        <main class="thread" id="thread" aria-live="polite"></main>
+      </div>
+
+      <form class="composer" id="composer">
+        <textarea
+          id="prompt"
+          rows="3"
+          placeholder="已登录且已信任时，这里就是 composer。Enter 发送，Shift+Enter 换行。"
+          disabled
+        ></textarea>
+        <div class="composer-bar">
+          <span class="hint" id="hint">先启动 <code>grok agent --always-approve --no-leader serve</code></span>
+          <button type="submit" id="btn-send" disabled>发送</button>
+        </div>
+      </form>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

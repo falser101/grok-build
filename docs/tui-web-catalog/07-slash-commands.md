@@ -47,7 +47,7 @@ Web 菜单徽章：本地 pager = **P**（描边），`availableCommands` 内置
 | /P-share | `/share` | | S-24 | 扩展 | 是 |
 | /P-session-info | `/session-info` | `/status` `/info` | S-07 | 同 | 是 |
 | /P-rename | `/rename` | `/title` | S-08 | 同 | 是 |
-| /P-dashboard | `/dashboard` | `/agents-dashboard` `/sessions` | D-；Minimal 藏；`GROK_AGENT_DASHBOARD=0` 关 | 会话列表页（磁盘而非进程 roster） | 菜单可见/轻提示 |
+| /P-dashboard | `/dashboard` | `/agents-dashboard` `/sessions` | D-；Minimal 藏；`GROK_AGENT_DASHBOARD=0` 关 | 会话列表页（磁盘而非进程 roster） | 是 |
 | /P-cd | `/cd` | | S-31 | 慎 | 是 |
 | /P-theme | `/theme` `/t` | | picker 实时预览；无参循环；Minimal 无 | composer 上浅/暗/系统色块下拉，点选即预览现有 CSS | 是 |
 | /P-feedback | `/feedback` | | 也是 S；无参开面板 | B-16 | 是 |

@@ -237,6 +237,33 @@
             <div id="session-index-list"></div>
           </section>
 
+          <section class="surface dashboard" id="dashboard" hidden>
+            <div class="dash-head">
+              <h2>运行中会话</h2>
+              <p class="muted dash-sub">磁盘会话 + 当前连接上的多会话，不是 Agent 定义（/config-agents）。</p>
+              <label class="dash-search-wrap">
+                <span class="sr-only">搜索运行中会话</span>
+                <input id="dash-search" spellcheck="false" autocomplete="off" placeholder="搜索标题 / 摘要 / id" />
+              </label>
+            </div>
+            <div class="dash-body">
+              <div id="dash-list" role="list"></div>
+              <aside id="dash-peek" class="dash-peek">
+                <h3>预览</h3>
+                <pre id="dash-peek-body" class="dash-peek-body"></pre>
+                <form id="dash-peek-form" class="dash-peek-form">
+                  <input id="dash-peek-input" spellcheck="false" autocomplete="off" placeholder="回复此会话…" />
+                  <button type="submit" id="dash-peek-send">发送</button>
+                </form>
+                <button type="button" id="dash-peek-open">进会话发送</button>
+              </aside>
+            </div>
+            <form id="dash-new-form" class="dash-new">
+              <input id="dash-new-input" spellcheck="false" autocomplete="off" placeholder="新会话" />
+              <button type="submit" id="dash-new-btn">新会话</button>
+            </form>
+          </section>
+
           <div class="stage-chat">
             <main class="thread" id="thread" aria-live="polite"></main>
             <aside id="slash-help-card" class="slash-help-card" hidden>

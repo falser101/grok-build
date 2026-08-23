@@ -59,6 +59,9 @@ test("planSlash classifies local, send, later, forbidden", () => {
   assert.equal(planSlash("/settings").kind, "local");
   assert.equal(planSlash("/share").kind, "local");
   assert.equal(planSlash("not a slash").kind, "pass");
+  assert.deepEqual(planSlash("/dashboard"), { kind: "local", name: "dashboard", args: "" });
+  assert.deepEqual(planSlash("/sessions"), { kind: "local", name: "dashboard", args: "" });
+  assert.deepEqual(planSlash("/agents-dashboard"), { kind: "local", name: "dashboard", args: "" });
 });
 
 test("builtin names win over availableCommands; skills stay dynamic", () => {
@@ -105,6 +108,8 @@ test("canonical aliases and help listing", () => {
   assert.match(help, /\/exit/);
   assert.match(help, /\/help/);
   assert.doesNotMatch(help, /gboom/);
+  assert.match(help, /\/dashboard/);
+  assert.match(help, /运行中会话/);
 });
 
 test("slashKind badges: local pager, available shell, scoped skill", () => {

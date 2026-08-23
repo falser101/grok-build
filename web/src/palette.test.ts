@@ -10,6 +10,7 @@ import {
   groupPaletteItems,
   hashForSession,
   hashForSessions,
+  hashForDashboard,
   hintForFocus,
   inferTurnPhase,
   parseContextUsage,
@@ -20,6 +21,8 @@ import {
 
 test("parse hash routes for sessions and session id", () => {
   assert.deepEqual(parseHashRoute("#/sessions"), { kind: "sessions" });
+  assert.deepEqual(parseHashRoute("#/dashboard"), { kind: "dashboard" });
+  assert.equal(hashForDashboard(), "#/dashboard");
   assert.deepEqual(parseHashRoute("#/s/abc-1"), { kind: "session", id: "abc-1" });
   assert.deepEqual(parseHashRoute("#/s/a%2Fb"), { kind: "session", id: "a/b" });
   assert.equal(parseHashRoute("#/other").kind, "other");

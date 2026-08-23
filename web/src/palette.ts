@@ -1,5 +1,6 @@
 export type HashRoute =
   | { kind: "sessions" }
+  | { kind: "dashboard" }
   | { kind: "session"; id: string }
   | { kind: "other"; raw: string };
 
@@ -7,6 +8,7 @@ export function parseHashRoute(hash: string): HashRoute {
   const raw = hash.startsWith("#") ? hash.slice(1) : hash;
   const path = (raw.split("?")[0] ?? "").replace(/\/+$/, "") || "/";
   if (path === "/sessions" || path === "sessions") return { kind: "sessions" };
+  if (path === "/dashboard" || path === "dashboard") return { kind: "dashboard" };
   const m = /^\/?s\/([^/]+)$/.exec(path);
   if (m?.[1]) {
     try {
@@ -20,6 +22,10 @@ export function parseHashRoute(hash: string): HashRoute {
 
 export function hashForSessions(): string {
   return "#/sessions";
+}
+
+export function hashForDashboard(): string {
+  return "#/dashboard";
 }
 
 export function hashForSession(id: string): string {

@@ -2,23 +2,11 @@
 
 本机浏览器客户端，经 ACP WebSocket 连 `grok agent serve`。和 TUI 共用同一个 `MvpAgent` 与 `~/.grok/sessions/`。
 
-当前：运输层（Slice 0）+ 启动/鉴权/Welcome（catalog 02）。权限卡、slash、主题仍未做。
+浏览器不能当 Agent（它要跑 bash、读仓库、写 session）。TUI 启动时会在同进程里拉起 Agent；Web 则由 `npm run dev` 自动起一个 `grok agent serve`，页面连 **同源** `/ws`，Vite 把 secret 注进代理。你不用填 Secret，也不用另开终端。
+
+当前：运输层 + 启动/鉴权/Welcome + 会话/对话 + 阻塞卡（权限 / 提问 / Plan / 停止）。本地 `npm run dev` 仍带 `--always-approve`，ask 模式现在可以在 Web 里点批准。
 
 ## 启动
-
-终端 A — Agent（必须 `--always-approve`，否则工具会卡在权限请求；Slice 0 会把权限取消掉）：
-
-```bash
-grok agent --always-approve --no-leader serve --bind 127.0.0.1:2419 --secret slice0dev
-```
-
-stderr 会打印：
-
-```
-WebSocket URL: ws://127.0.0.1:2419/ws?server-key=slice0dev
-```
-
-终端 B — 前端：
 
 ```bash
 cd web
@@ -26,17 +14,22 @@ npm install
 npm run dev
 ```
 
-打开 http://localhost:5173
+打开 http://localhost:5173 — 页面会自己连本机 grok。左侧是会话列表（点开 / 新建）；连接与 Secret 在左下「设置」弹窗。
 
-- WebSocket 默认 `ws://127.0.0.1:2419/ws`
-- Secret 填 `slice0dev`（只存在 localStorage，不进 git）
-- cwd 默认本仓库路径
+`npm run dev` 做的事：
 
-点「连接」，输入一句话发送。
+1. 若 `127.0.0.1:2419` 空闲，启动 **PATH 上已安装的 `grok`**（不是本仓库 cargo 产物），工作目录是 `$HOME`，会话来自 `~/.grok/sessions/`
+2. 侧栏 `x.ai/session/list` **不带 cwd**，列出本机全部会话，不限本仓库
+3. 起 Vite，把 `/ws` 代理到 serve（带 `server-key`）
+4. Ctrl+C 停 Vite；若这次是它拉起的 Agent，一并停掉
+
+覆盖：`GROK_BIN`、`GROK_AGENT_CWD`（默认家目录）、`GROK_AGENT_BIND`（默认 `127.0.0.1:2419`）、`GROK_AGENT_SECRET`。
+
+只起前端、自己管 Agent：`npm run dev:vite`。
 
 ## 验收
 
-- 错误 secret / 进程未起：全页 doctor 文案（401 / 进程未起）
+- 错误 secret / 进程未起：全页 doctor 文案（401 / 进程未起）。e2e 用 `?noconnect=1` 再填高级连接。
 - 连上后 Welcome 或登录；未登录不能发送
 - 对话能流式出来
 - 同一 `session id` 可在 TUI 里 `/resume`
@@ -51,7 +44,7 @@ npm run dev
 
 ## Playwright 真人操作
 
-起好 serve 和 `npm run dev` 之后：
+起好 `npm run dev` 之后：
 
 ```bash
 npm test          # protocol + startup 决策 helper 单元测试

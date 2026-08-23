@@ -26,8 +26,13 @@ import {
   parseInitialize,
   parsePaywall,
   parseSessionList,
+  autoConnectEnabled,
   persistDockFields,
   persistableDockFields,
+  parseSessionListPage,
+  buildSessionListParams,
+  sessionListParamsAreGlobal,
+  SESSION_LIST_PAGE_SIZE,
   selectEagerAuthMethod,
   startupAuthDecision,
   storageContainsApiKey,
@@ -172,6 +177,13 @@ test("composer send is gated on auth and never auto-YOLO trust", () => {
   assert.deepEqual(auto, { outcome: "reject" });
 });
 
+test("auto-connect is on unless noconnect=1", () => {
+  assert.equal(autoConnectEnabled(""), true);
+  assert.equal(autoConnectEnabled("?foo=1"), true);
+  assert.equal(autoConnectEnabled("?noconnect=1"), false);
+  assert.equal(autoConnectEnabled("noconnect=1&x=1"), false);
+});
+
 test("API key is not a persistable dock field and never written to localStorage", () => {
   const storage = memoryStorage();
   persistDockFields(
@@ -265,6 +277,29 @@ test("paywall consent session list and session/new workspace ACK helpers", () =>
     sessions: [{ sessionId: "s1", summary: "hello", cwd: "/repo" }],
   });
   assert.equal(sessions[0]?.sessionId, "s1");
+  const page = parseSessionListPage({
+    sessions: [{ sessionId: "s1", summary: "hello", cwd: "/other" }],
+    nextCursor: "p2",
+  });
+  assert.equal(page.nextCursor, "p2");
+  const globalList = buildSessionListParams();
+  assert.equal(sessionListParamsAreGlobal(globalList), true);
+  assert.equal((globalList as { limit: number }).limit, SESSION_LIST_PAGE_SIZE);
+  const filtered = buildSessionListParams({ cwd: "/home/falser/Projects/grok-build" });
+  assert.equal(sessionListParamsAreGlobal(filtered), false);
+  const paged = parseSessionListPage({
+    result: {
+      sessions: [{ session_id: "s2", title: "t", cwd: "/a" }],
+      next_cursor: "page-2",
+    },
+  });
+  assert.equal(paged.sessions[0]?.sessionId, "s2");
+  assert.equal(paged.nextCursor, "page-2");
+  const newParams = buildSessionNewParams({ cwd: "/real/local/path" }) as {
+    cwd: string;
+    mcpServers: unknown[];
+  };
+  assert.equal(newParams.cwd, "/real/local/path");
   const created = buildSessionNewParams({
     cwd: "/repo",
     localWorkspace: { mode: "own" },

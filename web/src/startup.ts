@@ -3,6 +3,12 @@ import type { Json } from "./protocol";
 export const CONNECTING_COPY = "正在连接本机 grok…";
 export const FIRST_ACP_METHOD = "initialize";
 
+/** Tests that fill the dock first use `?noconnect=1`. */
+export function autoConnectEnabled(search = ""): boolean {
+  const raw = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(raw).get("noconnect") !== "1";
+}
+
 export const DOCK_STORAGE_KEYS = {
   url: "grok-web.ws",
   secret: "grok-web.secret",
@@ -44,7 +50,11 @@ export type ComposerGate = {
 
 export type ConnectFailureKind = "unauthorized" | "process-down" | "generic";
 
-export type AvailableCommand = { name: string; description: string | null };
+export type AvailableCommand = {
+  name: string;
+  description: string | null;
+  argumentHint: string | null;
+};
 
 export type InitializeSnapshot = {
   grokShell: boolean;
@@ -75,6 +85,15 @@ export type SessionListEntry = {
   sessionId: string;
   summary: string;
   cwd: string | null;
+  updatedAt: string | null;
+  source: string | null;
+  lastTurnSummary: string | null;
+  sessionKind: string | null;
+  adminKind: "build" | "chat";
+  worktreeLabel: string | null;
+  gitRootDir: string | null;
+  sourceWorkspaceDir: string | null;
+  repoName: string | null;
 };
 
 export type FolderTrustOutcome = "trust" | "reject";
@@ -390,6 +409,10 @@ export function parseInitialize(init: Json): InitializeSnapshot {
         availableCommands.push({
           name: cr.name,
           description: typeof cr.description === "string" ? cr.description : null,
+          argumentHint:
+            (typeof cr.argumentHint === "string" && cr.argumentHint) ||
+            (typeof cr.argument_hint === "string" && cr.argument_hint) ||
+            null,
         });
       }
     }
@@ -475,28 +498,75 @@ export function ackConsent(storage: Pick<Storage, "setItem">, email: string | nu
 }
 
 export function parseSessionList(payload: Json): SessionListEntry[] {
+  return parseSessionListPage(payload).sessions;
+}
+
+/** One `x.ai/session/list` page. Omit cwd on the request to list every directory. */
+export function parseSessionListPage(payload: Json): {
+  sessions: SessionListEntry[];
+  nextCursor: string | null;
+} {
   const rec = asRecord(payload);
   const inner = asRecord(rec?.result ?? payload);
   const rows = inner?.sessions;
-  if (!Array.isArray(rows)) return [];
-  const out: SessionListEntry[] = [];
-  for (const row of rows) {
-    const r = asRecord(row);
-    const sessionId =
-      (typeof r?.sessionId === "string" && r.sessionId) ||
-      (typeof r?.session_id === "string" && r.session_id) ||
-      null;
-    if (!sessionId) continue;
-    out.push({
-      sessionId,
-      summary:
-        (typeof r?.summary === "string" && r.summary) ||
-        (typeof r?.title === "string" && r.title) ||
+  const sessions: SessionListEntry[] = [];
+  if (Array.isArray(rows)) {
+    for (const row of rows) {
+      const r = asRecord(row);
+      const sessionId =
+        (typeof r?.sessionId === "string" && r.sessionId) ||
+        (typeof r?.session_id === "string" && r.session_id) ||
+        null;
+      if (!sessionId) continue;
+      const meta = asRecord(r?._meta ?? r?.meta ?? null);
+      const sessionMeta = asRecord(meta?.["x.ai/session"] ?? null);
+      const kindRaw =
+        (typeof sessionMeta?.kind === "string" && sessionMeta.kind) ||
+        (typeof r?.sessionKind === "string" && r.sessionKind) ||
+        "build";
+      sessions.push({
         sessionId,
-      cwd: typeof r?.cwd === "string" ? r.cwd : null,
-    });
+        summary:
+          (typeof r?.summary === "string" && r.summary) ||
+          (typeof r?.title === "string" && r.title) ||
+          sessionId,
+        cwd: typeof r?.cwd === "string" && r.cwd ? r.cwd : null,
+        updatedAt:
+          (typeof r?.updatedAt === "string" && r.updatedAt) ||
+          (typeof r?.updated_at === "string" && r.updated_at) ||
+          (typeof r?.lastActiveAt === "string" && r.lastActiveAt) ||
+          null,
+        source: typeof r?.source === "string" ? r.source : null,
+        lastTurnSummary:
+          (typeof r?.lastTurnSummary === "string" && r.lastTurnSummary) ||
+          (typeof r?.last_turn_summary === "string" && r.last_turn_summary) ||
+          null,
+        sessionKind: typeof r?.sessionKind === "string" ? r.sessionKind : null,
+        adminKind: kindRaw === "chat" ? "chat" : "build",
+        worktreeLabel:
+          (typeof r?.worktreeLabel === "string" && r.worktreeLabel) ||
+          (typeof r?.worktree_label === "string" && r.worktree_label) ||
+          null,
+        gitRootDir:
+          (typeof r?.gitRootDir === "string" && r.gitRootDir) ||
+          (typeof r?.git_root_dir === "string" && r.git_root_dir) ||
+          null,
+        sourceWorkspaceDir:
+          (typeof r?.sourceWorkspaceDir === "string" && r.sourceWorkspaceDir) ||
+          (typeof r?.source_workspace_dir === "string" && r.source_workspace_dir) ||
+          null,
+        repoName:
+          (typeof r?.repoName === "string" && r.repoName) ||
+          (typeof r?.repo_name === "string" && r.repo_name) ||
+          null,
+      });
+    }
   }
-  return out;
+  const nextCursor =
+    (typeof inner?.nextCursor === "string" && inner.nextCursor) ||
+    (typeof inner?.next_cursor === "string" && inner.next_cursor) ||
+    null;
+  return { sessions, nextCursor };
 }
 
 export function localWorkspaceRequiresAck(snapshot: InitializeSnapshot): boolean {
@@ -537,8 +607,32 @@ export function buildSubmitCodeParams(code: string): Json {
   return { code };
 }
 
-export function buildSessionListParams(cwd: string): Json {
-  return { cwd, limit: 30, allowRelax: true };
+/** Page size for the sidebar. Shell default is 30; we ask for more so one call covers most disks. */
+export const SESSION_LIST_PAGE_SIZE = 200;
+
+/**
+ * Global picker: **no `cwd`**. `list_summaries(None)` walks all of `~/.grok/sessions`.
+ * Passing a cwd only returns that directory (or relaxes if empty).
+ */
+export function buildSessionListParams(input?: {
+  cwd?: string;
+  cursor?: string | null;
+  limit?: number;
+  query?: string;
+}): Json {
+  const params: { [k: string]: Json } = {
+    limit: input?.limit ?? SESSION_LIST_PAGE_SIZE,
+  };
+  if (input?.cwd) params.cwd = input.cwd;
+  if (input?.cursor) params.cursor = input.cursor;
+  if (input?.query) params.query = input.query;
+  return params;
+}
+
+/** Picker must not send cwd — shell then lists every `~/.grok/sessions` directory. */
+export function sessionListParamsAreGlobal(params: Json): boolean {
+  const rec = asRecord(params);
+  return rec !== null && !("cwd" in rec);
 }
 
 export function buildWorktreeCreateParams(input: {

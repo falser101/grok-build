@@ -4,139 +4,437 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Grok Web</title>
+    <script>
+      (function () {
+        var pref = localStorage.getItem("grok-web.theme") || "auto";
+        var light =
+          pref === "light" ||
+          (pref !== "dark" &&
+            window.matchMedia &&
+            matchMedia("(prefers-color-scheme: light)").matches);
+        document.documentElement.dataset.theme = light ? "light" : "dark";
+        document.documentElement.style.colorScheme = light ? "light" : "dark";
+      })();
+    </script>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <div id="app" data-surface="idle" data-phases="">
-      <header class="mast">
-        <div class="mast-mark">
-          <span class="mast-dot" data-state="idle" id="conn-dot"></span>
-          <div>
-            <h1>Grok Web</h1>
-            <p class="mast-sub">ACP over <code>grok agent serve</code></p>
-          </div>
+    <div id="app" class="shell" data-surface="idle" data-phases="" data-sidebar="open" data-composer="center">
+      <aside id="sidebar">
+        <div id="sidebar-head">
+          <button id="btn-sidebar-toggle" type="button" aria-label="折叠侧栏" title="折叠侧栏">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+              <rect
+                x="1.75"
+                y="2.5"
+                width="12.5"
+                height="11"
+                rx="1.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.25"
+              />
+              <path d="M6.25 2.5v11" fill="none" stroke="currentColor" stroke-width="1.25" />
+            </svg>
+          </button>
+          <h1>Grok</h1>
         </div>
-        <div class="mast-meta">
-          <span id="conn-label">未连接</span>
-          <span class="session" id="session-label">无 session</span>
-          <span id="plan-badge" hidden></span>
-          <span id="version-badge"></span>
-        </div>
-      </header>
-
-      <section class="dock" aria-label="连接">
-        <label>
-          WebSocket
-          <input id="ws-url" spellcheck="false" autocomplete="off" />
-        </label>
-        <label>
-          Secret
-          <input id="secret" type="password" spellcheck="false" autocomplete="off" />
-        </label>
-        <label class="grow">
-          cwd
-          <input id="cwd" spellcheck="false" autocomplete="off" />
-        </label>
-        <div class="dock-actions">
-          <button id="btn-connect" type="button">连接</button>
-          <button id="btn-disconnect" type="button" disabled>断开</button>
-          <button id="btn-new" type="button" disabled>新会话</button>
-          <button id="btn-logout" type="button" hidden>退出登录</button>
-          <button id="btn-switch-account" type="button" hidden>切换账号</button>
-        </div>
-      </section>
-
-      <p class="banner" id="banner" hidden></p>
-      <p class="banner warn" id="startup-warnings" hidden></p>
-
-      <div class="stage">
-        <section class="surface" id="connecting" hidden>
-          <p class="connecting-copy" id="connecting-copy">正在连接本机 grok…</p>
-        </section>
-
-        <section class="surface doctor" id="doctor" hidden>
-          <h2>连接失败</h2>
-          <p id="doctor-copy"></p>
-          <button id="btn-doctor-retry" type="button">重试</button>
-        </section>
-
-        <section class="surface login" id="login" hidden>
-          <h2>登录</h2>
-          <p class="muted" id="login-hint">用本机 Agent 的鉴权方法登录。API key 不会写入 localStorage。</p>
-          <button id="btn-login-primary" type="button">grok.com</button>
-          <p class="muted" id="login-browser-hint" hidden>即将打开浏览器</p>
-          <label>
-            API key
-            <input
-              id="api-key"
-              type="password"
-              spellcheck="false"
-              autocomplete="off"
-              placeholder="xai-…"
+        <button id="btn-new" type="button" disabled>
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <path
+              d="M8 3.25v9.5M3.25 8h9.5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
             />
-          </label>
-          <button id="btn-api-key" type="button">用 API key 登录</button>
-          <label>
-            授权码
-            <input id="auth-code" spellcheck="false" autocomplete="off" />
-          </label>
-          <button id="btn-submit-code" type="button">提交授权码</button>
-          <div id="authenticating" hidden>
-            <p class="connecting-copy">正在登录 <span id="auth-provider-name"></span>…</p>
-            <button id="btn-auth-cancel" type="button">取消</button>
-          </div>
-        </section>
-
-        <section class="surface welcome" id="welcome" hidden>
-          <p class="welcome-mark">Grok</p>
-          <h2>Welcome</h2>
-          <p class="welcome-cwd" id="welcome-cwd"></p>
-          <p class="muted" id="welcome-version"></p>
-          <div class="card" id="consent-banner" hidden>
-            <p>是否允许 xAI 保留 coding data 用于改进模型？ZDR/托管策略下可能不可改。</p>
-            <div class="row">
-              <button id="btn-consent-in" type="button">Opt in</button>
-              <button id="btn-consent-out" type="button">Opt out</button>
+          </svg>
+          <span>新会话</span>
+        </button>
+        <label class="session-search-wrap">
+          <span class="sr-only">查找会话</span>
+          <input
+            id="session-search"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="搜索会话"
+          />
+        </label>
+        <div id="session-list" role="list"></div>
+        <div id="sidebar-foot">
+          <div id="account-chip">
+            <span class="mast-dot" data-state="idle" id="conn-dot"></span>
+            <div class="chip-copy">
+              <span id="conn-label">未连接</span>
+              <span id="plan-badge" hidden></span>
+              <span id="yolo-badge" hidden>YOLO</span>
+              <span id="version-badge"></span>
             </div>
           </div>
-          <div class="card paywall" id="paywall" hidden>
-            <p id="paywall-copy"></p>
-            <a id="paywall-link" href="https://grok.com" target="_blank" rel="noreferrer">grok.com</a>
+          <div class="foot-actions">
+            <button id="btn-settings" type="button">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                <circle cx="8" cy="8" r="2.1" fill="none" stroke="currentColor" stroke-width="1.25" />
+                <path
+                  d="M8 2.4v1.3M8 12.3v1.3M2.4 8h1.3M12.3 8h1.3M4.05 4.05l.92.92M11.03 11.03l.92.92M11.03 4.97l.92-.92M4.05 11.95l.92-.92"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.25"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <span>设置</span>
+            </button>
           </div>
-          <div class="card" id="workspace-ack" hidden>
-            <p>此会话会使用本机 local workspace。确认后再开 session。</p>
-            <button id="btn-workspace-ack" type="button">确认并继续</button>
+        </div>
+      </aside>
+
+      <div
+        id="sidebar-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整侧栏宽度"
+        tabindex="0"
+      ></div>
+
+      <div id="main">
+        <header id="main-header">
+          <button id="btn-sidebar-open" type="button" aria-label="打开侧栏" title="打开侧栏">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+              <rect
+                x="1.75"
+                y="2.5"
+                width="12.5"
+                height="11"
+                rx="1.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.25"
+              />
+              <path d="M6.25 2.5v11" fill="none" stroke="currentColor" stroke-width="1.25" />
+            </svg>
+          </button>
+          <span class="session" id="session-label">无 session</span>
+          <div class="header-actions">
+            <button id="btn-home" type="button" disabled>回列表</button>
+            <details id="session-tools">
+              <summary>会话</summary>
+              <div class="session-menu">
+                <button id="btn-info" type="button" disabled>会话信息</button>
+                <button id="btn-rename" type="button" disabled>重命名</button>
+                <button id="btn-delete" type="button" disabled>删除</button>
+                <button id="btn-fork" type="button" disabled>分支</button>
+                <button id="btn-rewind" type="button" disabled>回退</button>
+                <button id="btn-compact" type="button" disabled>压缩</button>
+                <button id="btn-context" type="button" disabled>上下文</button>
+                <button id="btn-recap" type="button" disabled>回顾</button>
+                <button id="btn-export" type="button" disabled>导出</button>
+                <button id="btn-transcript" type="button" disabled>下载记录</button>
+                <button id="btn-share" type="button" disabled>分享</button>
+                <button id="btn-cd" type="button" disabled>改工作目录</button>
+                <button id="btn-worktree-new" type="button" disabled>新 worktree</button>
+                <button id="btn-worktree-resume" type="button" disabled>在 worktree 打开</button>
+                <button id="btn-expand-all" type="button" disabled>全部展开</button>
+                <button id="btn-collapse-all" type="button" disabled>全部折叠</button>
+              </div>
+            </details>
           </div>
-          <div class="card" id="trust-dialog" hidden>
-            <p id="trust-copy">首次在此文件夹运行。是否信任该 cwd？默认不自动 YOLO。</p>
-            <div class="row">
-              <button id="btn-trust-yes" type="button">信任</button>
-              <button id="btn-trust-no" type="button">不信任</button>
+        </header>
+        <p class="banner" id="banner" hidden></p>
+        <p class="banner warn" id="startup-warnings" hidden></p>
+
+        <div class="stage">
+          <section class="surface overlay" id="connecting" hidden>
+            <p class="connecting-copy" id="connecting-copy">正在连接本机 grok…</p>
+          </section>
+
+          <section class="surface doctor" id="doctor" hidden>
+            <h2>连接失败</h2>
+            <p id="doctor-copy"></p>
+            <button id="btn-doctor-retry" type="button">重试</button>
+          </section>
+
+          <section class="surface login" id="login" hidden>
+            <h2>登录</h2>
+            <p class="muted" id="login-hint">用本机 Agent 的鉴权方法登录。API key 不会写入 localStorage。</p>
+            <button id="btn-login-primary" type="button">grok.com</button>
+            <p class="muted" id="login-browser-hint" hidden>即将打开浏览器</p>
+            <label>
+              API key
+              <input
+                id="api-key"
+                type="password"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="xai-…"
+              />
+            </label>
+            <button id="btn-api-key" type="button">用 API key 登录</button>
+            <label>
+              授权码
+              <input id="auth-code" spellcheck="false" autocomplete="off" />
+            </label>
+            <button id="btn-submit-code" type="button">提交授权码</button>
+            <div id="authenticating" hidden>
+              <p class="connecting-copy">正在登录 <span id="auth-provider-name"></span>…</p>
+              <button id="btn-auth-cancel" type="button">取消</button>
+            </div>
+          </section>
+
+          <section class="surface welcome" id="welcome" hidden>
+            <h2>有什么可以帮你</h2>
+            <p class="welcome-cwd" id="welcome-cwd"></p>
+            <p class="muted" id="welcome-version"></p>
+            <div class="card" id="consent-banner" hidden>
+              <p>允许 xAI 用你的编程数据改进模型？组织策略下可能改不了。</p>
+              <div class="row">
+                <button id="btn-consent-in" type="button">Opt in</button>
+                <button id="btn-consent-out" type="button">Opt out</button>
+              </div>
+            </div>
+            <div class="card paywall" id="paywall" hidden>
+              <p id="paywall-copy"></p>
+              <a id="paywall-link" href="https://grok.com" target="_blank" rel="noreferrer">grok.com</a>
+            </div>
+            <div class="card" id="workspace-ack" hidden>
+              <p>这次会话会用本机工作区。确认后再开始。</p>
+              <button id="btn-workspace-ack" type="button">确认并继续</button>
+            </div>
+            <div class="card" id="trust-dialog" hidden>
+              <p id="trust-copy">首次在此文件夹运行。是否信任该 cwd？默认不自动 YOLO。</p>
+              <div class="row">
+                <button id="btn-trust-yes" type="button">信任</button>
+                <button id="btn-trust-no" type="button">不信任</button>
+              </div>
+            </div>
+            <div class="welcome-actions">
+              <button id="btn-continue" type="button" disabled>继续上次</button>
+              <button id="btn-welcome-new" type="button">新会话</button>
+              <button id="btn-worktree" type="button">新 worktree</button>
+              <button id="btn-import-claude" type="button" hidden>导入 Claude</button>
+            </div>
+          </section>
+
+          <div class="stage-chat">
+            <main class="thread" id="thread" aria-live="polite"></main>
+            <button type="button" id="btn-follow" hidden>回到最新</button>
+            <nav id="thread-rail" hidden>
+              <div class="rail-nav">
+                <button type="button" id="rail-prev-chip">上一个响应</button>
+                <button type="button" id="rail-up" aria-label="上一个响应">
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                    <path
+                      d="M3.5 10.25 8 5.75l4.5 4.5"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div id="rail-track"></div>
+              <button type="button" id="rail-down" aria-label="下一个响应">
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                  <path
+                    d="M3.5 5.75 8 10.25l4.5-4.5"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+              <div id="rail-preview" hidden>
+                <span class="rail-preview-who">你</span>
+                <p class="rail-preview-text" id="rail-preview-text"></p>
+              </div>
+            </nav>
+          </div>
+        </div>
+
+        <div id="find-bar" hidden>
+          <input id="find-input" placeholder="在对话中查找" />
+          <span id="find-count"></span>
+          <button type="button" id="btn-find-close">关闭</button>
+        </div>
+        <div id="jump-panel" hidden></div>
+        <div id="queue-strip" hidden></div>
+        <div id="follow-ups" hidden></div>
+        <p class="nudge" id="plan-nudge" hidden>像在做计划。Shift+Tab 可切 plan mode。</p>
+        <div id="block-host">
+          <button type="button" id="block-pill" hidden></button>
+          <section id="block-card" hidden></section>
+        </div>
+        <form class="composer" id="composer" data-filled="0">
+          <input id="file-pick" type="file" hidden multiple />
+          <div id="image-chips"></div>
+          <div class="composer-main">
+            <button type="button" id="btn-attach" aria-label="添加文件" title="添加文件">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                <path
+                  d="M8 3.2v9.6M3.2 8h9.6"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+            <div class="composer-input-wrap">
+              <span id="composer-prefix" aria-hidden="true">❯</span>
+              <textarea
+                id="prompt"
+                rows="1"
+                placeholder="畅所欲问"
+                disabled
+              ></textarea>
+              <div id="ghost" hidden></div>
+              <div id="slash-menu" hidden role="listbox"></div>
+              <div id="prompt-history" hidden role="listbox"></div>
+              <div id="at-menu" hidden role="listbox"></div>
+            </div>
+            <div class="composer-toolbar-end">
+              <button type="button" id="btn-permission-chip">每次询问</button>
+              <button type="button" id="btn-model-chip">模型</button>
+              <button type="button" id="btn-effort-chip">思考</button>
+              <button type="button" id="btn-interject" hidden>插入</button>
+              <button type="submit" id="btn-send" disabled aria-label="发送">
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                  <path
+                    d="M8 12.5V3.5M4.2 7.2 8 3.5l3.8 3.7"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.7"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+              <button type="button" id="btn-stop" hidden aria-label="停止">
+                <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+                  <rect x="4" y="4" width="8" height="8" rx="1.2" fill="currentColor" />
+                </svg>
+              </button>
             </div>
           </div>
-          <div class="welcome-actions">
-            <button id="btn-continue" type="button" disabled>继续上次</button>
-            <button id="btn-welcome-new" type="button">新会话</button>
-            <button id="btn-worktree" type="button">新 worktree</button>
-            <button id="btn-import-claude" type="button" hidden>导入 Claude</button>
-          </div>
-        </section>
-
-        <main class="thread" id="thread" aria-live="polite"></main>
+          <div id="composer-menu" hidden role="menu"></div>
+          <span class="hint" id="hint">页面会连上本机 grok</span>
+        </form>
+        <div id="selection-bar" hidden>
+          <button type="button" id="btn-sel-copy">复制</button>
+        </div>
       </div>
 
-      <form class="composer" id="composer">
-        <textarea
-          id="prompt"
-          rows="3"
-          placeholder="已登录且已信任时，这里就是 composer。Enter 发送，Shift+Enter 换行。"
-          disabled
-        ></textarea>
-        <div class="composer-bar">
-          <span class="hint" id="hint">先启动 <code>grok agent --always-approve --no-leader serve</code></span>
-          <button type="submit" id="btn-send" disabled>发送</button>
+      <div id="settings-modal" hidden>
+        <div class="settings-panel" role="dialog" aria-labelledby="settings-title">
+          <div class="settings-head">
+            <h2 id="settings-title">设置</h2>
+            <button id="btn-settings-close" type="button">关闭</button>
+          </div>
+          <label class="grow">
+            cwd
+            <input id="cwd" spellcheck="false" autocomplete="off" />
+          </label>
+          <label class="grow">
+            外观
+            <select id="theme-pref">
+              <option value="auto">跟随系统</option>
+              <option value="dark">深色</option>
+              <option value="light">浅色</option>
+            </select>
+          </label>
+          <label class="check">
+            <input id="enter-sends" type="checkbox" checked />
+            Enter 发送（关闭则 Ctrl+Enter 发送）
+          </label>
+          <label class="check">
+            <input id="show-thinking" type="checkbox" checked />
+            显示思考
+          </label>
+          <label class="check">
+            <input id="group-tools" type="checkbox" checked />
+            合并只读工具
+          </label>
+          <label class="check">
+            <input id="show-timestamps" type="checkbox" />
+            显示时间戳
+          </label>
+          <label class="check">
+            <input id="show-rail" type="checkbox" checked />
+            显示时间线
+          </label>
+          <label class="check">
+            <input id="combine-queued" type="checkbox" />
+            合并连续跟进
+          </label>
+          <label class="grow">
+            权限
+            <select id="permission-mode">
+              <option value="ask">每次询问</option>
+              <option value="auto">自动（仍可能提问）</option>
+              <option value="always-approve">始终允许</option>
+            </select>
+          </label>
+          <label class="grow">
+            取消时子 agent
+            <select id="cancel-subagents-pref">
+              <option value="ask">每次询问</option>
+              <option value="always_stop">一起停</option>
+              <option value="always_continue">留着跑</option>
+            </select>
+          </label>
+          <details class="dock-advanced" open>
+            <summary>高级连接</summary>
+            <div class="advanced-fields">
+              <label>
+                WebSocket
+                <input id="ws-url" spellcheck="false" autocomplete="off" />
+              </label>
+              <label>
+                Secret
+                <input id="secret" type="password" spellcheck="false" autocomplete="off" />
+              </label>
+            </div>
+          </details>
+          <div class="dock-actions">
+            <button id="btn-connect" type="button">连接</button>
+            <button id="btn-disconnect" type="button" disabled>断开</button>
+          </div>
+          <div class="account-actions">
+            <button id="btn-logout" type="button" hidden>退出登录</button>
+            <button id="btn-switch-account" type="button" hidden>切换账号</button>
+          </div>
+          <details>
+            <summary>Worktree</summary>
+            <button id="btn-worktree-list" type="button">列出</button>
+            <button id="btn-worktree-gc" type="button">GC（dry-run）</button>
+            <pre id="worktree-out" class="muted"></pre>
+          </details>
         </div>
-      </form>
+      </div>
+
+      <div id="action-modal" hidden>
+        <div class="settings-panel" role="dialog">
+          <div class="settings-head">
+            <h2 id="action-title">会话</h2>
+            <button id="btn-action-close" type="button">关闭</button>
+          </div>
+          <pre id="action-body" class="action-body"></pre>
+          <div id="action-list" class="action-list"></div>
+        </div>
+      </div>
+    </div>
+    <div id="session-popover" hidden role="menu"></div>
+    <div id="image-lightbox" hidden>
+      <button type="button" id="lightbox-prev" aria-label="上一张">‹</button>
+      <figure>
+        <img id="lightbox-img" alt="" />
+        <figcaption id="lightbox-count"></figcaption>
+      </figure>
+      <button type="button" id="lightbox-next" aria-label="下一张">›</button>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

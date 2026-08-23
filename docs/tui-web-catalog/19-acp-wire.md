@@ -10,12 +10,12 @@ Web 客户端按方法接。TUI 已全部使用或可使用。标准方法见 [A
 | Q-02 | `authenticate` | C→A | A-05 | 登录 | 否 |
 | Q-03 | `session/new` | C→A | S-01 | | 否 |
 | Q-04 | `session/load` | C→A | S-03 重连 | `_meta.cursor` yolo/auto | 否 |
-| Q-05 | `session/prompt` | C→A | I-01 | content blocks 含 text/image | 否 |
+| Q-05 | `session/prompt` | C→A | I-01 | content blocks 含 text/image；`[Image #N]` + displayNumber `_meta`；请求 `_meta.promptId`/`sendNow`/`screenMode` | 是 |
 | Q-06 | `session/cancel` | C→A | B-13 | Stop | 否 |
 | Q-07 | `session/set_mode` | C→A | plan | P-06 | 否 |
 | Q-08 | `session/setModel`? / 模型扩展 | C→A | `/model` | 以 initialize 与实测为准 | 否 |
 | Q-09 | `session/update` notif | A→C | 流 | 分发 C-/T- | 否 |
-| Q-10 | `session/request_permission` | A→C 请求 | B-01 | **必须回 response** | 否 |
+| Q-10 | `session/request_permission` | A→C 请求 | B-01 | **必须回 response** | 是 |
 | Q-11 | `session/close` | C→A | 退出 | | 否 |
 | Q-12 | fs/readTextFile 反向 | A→C | 若能力开 | 本机 Web 不要宣称 | 否（N/A） |
 | Q-13 | fs/writeTextFile 反向 | A→C | 若能力开 | 不要宣称 | 否（N/A） |
@@ -28,8 +28,8 @@ Web 客户端按方法接。TUI 已全部使用或可使用。标准方法见 [A
 
 | ID | 方法 | TUI 用途 | Web | Web 已实现 |
 |---|---|---|---|---|
-| Q-20 | `x.ai/ask_user_question` | **反向** B-10 | 必须实现 handler | 否 |
-| Q-21 | `x.ai/exit_plan_mode` | **反向** B-15 | 必须 | 否 |
+| Q-20 | `x.ai/ask_user_question` | **反向** B-10 | 必须实现 handler | 是 |
+| Q-21 | `x.ai/exit_plan_mode` | **反向** B-15 | 必须 | 是 |
 | Q-22 | `x.ai/session/fork` | S-12 | | 否 |
 | Q-23 | `x.ai/session/list` | picker/dashboard | | 否 |
 | Q-24 | `x.ai/session/info` | /session-info | | 否 |
@@ -60,7 +60,7 @@ Web 客户端按方法接。TUI 已全部使用或可使用。标准方法见 [A
 | Q-49 | `x.ai/workflows/list` | X-31 | | 否 |
 | Q-50 | `x.ai/code/status` | 代码状态 | 可选 | 否 |
 | Q-51 | `x.ai/debug/agent` | 内部 | 不要对用户暴露 | 否（不做） |
-| Q-52 | `x.ai/yolo_mode_changed` | 同步 YOLO | 听或发 | 否 |
+| Q-52 | `x.ai/yolo_mode_changed` | 同步 YOLO | 听或发 | 是 |
 | Q-53 | `x.ai/terminal/create` `kill` `output` `wait_for_exit` | 后者拒绝 | 不宣称 terminal | 否 |
 | Q-54 | `x.ai/session/repair` | 历史修复 | 高级 | 否 |
 | Q-55 | `x.ai/suggest/*` | 补全 | I-12 | 否 |

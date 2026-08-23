@@ -4,20 +4,20 @@ ACP：`tool_call` + `tool_call_update` + `ToolCallDeltaChunk`（参数流）。`
 
 | ID | 功能点 | TUI | Web 怎么做 | Web 已实现 |
 |---|---|---|---|---|
-| T-01 | 通用工具卡 | `OtherToolCallBlock`：名、pending/running/done/error、折叠详情 | 卡片：图标、状态、耗时 | 否 |
+| T-01 | 通用工具卡 | `OtherToolCallBlock`：名、pending/running/done/error、折叠详情 | 卡片：图标、状态、耗时 | 部分：折叠行 + 状态色 + 详情 `<pre>`；无耗时 |
 | T-02 | 参数流式 | `ToolCallDeltaChunk` 合并同一 tool_call_id | 参数区打字机；完整后 pretty JSON | 否 |
-| T-03 | read_file | `ReadToolCallBlock`：路径、行范围 | 路径链接 + 行号；点开查看器 | 否 |
+| T-03 | read_file | `ReadToolCallBlock`：路径、行范围 | 路径链接 + 行号；点开查看器 | 部分：路径链接 + offset:limit；点路径读文件；无独立查看器 |
 | T-04 | 读图/PDF/PPT | `read_file` 子类型 | 预览缩略图/页 | 否 |
-| T-05 | list_dir | `ListDirToolCallBlock` | 文件树片段 | 否 |
-| T-06 | grep / search | `SearchToolCallBlock`：文件命中、行命中 | 可点跳转（路径+行） | 否 |
-| T-07 | search_replace / edit | `EditToolCallBlock` 见 C-05 | diff viewer | 否 |
+| T-05 | list_dir | `ListDirToolCallBlock` | 文件树片段 | 部分：路径 + 截断 listing |
+| T-06 | grep / search | `SearchToolCallBlock`：文件命中、行命中 | 可点跳转（路径+行） | 部分：解析 `path:line:text` 命中列表，路径可点 |
+| T-07 | search_replace / edit | `EditToolCallBlock` 见 C-05 | diff viewer | 部分：时间线内 HTML hunk diff，默认展开 |
 | T-08 | 同文件连续 edit 合并 | `collapsed_edit_blocks` | 同 | 否 |
-| T-09 | bash / run_terminal_cmd | `ExecuteToolCallBlock` C-06 | 终端风格 `<pre>` | 否 |
+| T-09 | bash / run_terminal_cmd | `ExecuteToolCallBlock` C-06 | 终端风格 `<pre>` | 部分：`$` + ANSI `<pre>`，长输出截断 |
 | T-10 | 后台 bash | `TaskBackgrounded`：task_id、log 路径、description、monitor_description | 任务列表一行 + 跟日志 | 否 |
-| T-11 | web_search | `web_search.rs` 块 | 结果列表外链 | 否 |
-| T-12 | web_fetch | `web_fetch.rs` | URL + 摘录 | 否 |
+| T-11 | web_search | `web_search.rs` 块 | 结果列表外链 | 部分：query + citations 外链 |
+| T-12 | web_fetch | `web_fetch.rs` | URL + 摘录 | 部分：URL + 截断摘录 |
 | T-13 | x_search 等 | `_meta` kind search | 同搜索卡 | 否 |
-| T-14 | use_tool / MCP | `UseToolCallBlock`；server + tool | 徽章 MCP | 否 |
+| T-14 | use_tool / MCP | `UseToolCallBlock`；server + tool | 徽章 MCP | 部分：MCP 徽章 + 工具名；无完整 args 表 |
 | T-15 | memory_search / get | `memory_search.rs` | 记忆卡片 | 否 |
 | T-16 | todo write | plan entries → todo pane | U-17 | 否 |
 | T-17 | ask_user_question | 不单是块，是 B-10 | 同 | 否 |
@@ -35,12 +35,12 @@ ACP：`tool_call` + `tool_call_update` + `ToolCallDeltaChunk`（参数流）。`
 | T-29 | glob / grep_files | 当 search | 同 T-06 | 否 |
 | T-30 | skills 工具 | 加载 skill | 「使用了 skill X」 | 否 |
 | T-31 | computer-use / 本机电脑 | 若启用：截图 overlay | `<img>` 流；Web 本机控制仍在 Agent 侧 | 否 |
-| T-32 | 只读工具分组 | `group_tool_verbs` | C-37 | 否 |
+| T-32 | 只读工具分组 | `group_tool_verbs` | C-37 | 是：连续 read/search/list/fetch/websearch/memory 分组；edit/exec/mcp 不分组 |
 | T-33 | Hook 挂工具 | C-43 | 同 | 否 |
 | T-34 | Discovered MCP tool | `DiscoveredTool` | 动态名 | 否 |
 | T-35 | Integration search | `IntegrationSearchToolCallBlock` | 同搜索 | 否 |
-| T-36 | 失败/取消态 | status 色：红/灰 | 同 | 否 |
-| T-37 | 运行中动画 | accent wave `wave_rows`/`fps` | CSS spinner，不要 TUI wave | 否 |
-| T-38 | 工具路径可点 | `tool_paths` / OSC8 | `<a>` | 否 |
-| T-39 | 等待权限时的工具 | 卡打开时块显示 blocked | 状态「等待你批准」 | 否 |
+| T-36 | 失败/取消态 | status 色：红/灰 | 同 | 是 |
+| T-37 | 运行中动画 | accent wave `wave_rows`/`fps` | CSS spinner，不要 TUI wave | 部分：圆点 pulse，不要 TUI wave |
+| T-38 | 工具路径可点 | `tool_paths` / OSC8 | `<a>` | 是（`x.ai/fs/read_file` 弹窗） |
+| T-39 | 等待权限时的工具 | 卡打开时块显示 blocked | 状态「等待你批准」 | 部分：`pending_user` 行高亮；文案仍用 status |
 | T-40 | bash 语法高亮命令 | header 高亮 | 轻量 highlight | 否 |

@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
-import { copyFileSync, existsSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { spawn, execSync } from "node:child_process";
 import { homedir } from "node:os";
 
@@ -7,7 +8,7 @@ export const SECRET = process.env.GROK_WEB_SECRET ?? "slice0dev";
 export const WS = process.env.GROK_WEB_WS ?? "ws://127.0.0.1:2419/ws";
 export const CWD = process.env.GROK_WEB_CWD ?? "/home/falser/Projects/grok-build";
 export const AUTH_PATH = `${homedir()}/.grok/auth.json`;
-export const AUTH_BAK = "/tmp/grok-goal-eddab546d778/implementer/auth.json.bak";
+export const AUTH_BAK = join(homedir(), ".grok", "auth.json.web-e2e.bak");
 
 export type RpcCapture = { sent: string[]; received: string[] };
 
@@ -47,6 +48,11 @@ export function findSent(cap: RpcCapture, method: string) {
   return cap.sent.map(parseRpc).find((m) => m?.method === method) ?? null;
 }
 
+export function findLastSent(cap: RpcCapture, method: string) {
+  const hits = cap.sent.map(parseRpc).filter((m) => m?.method === method);
+  return hits.at(-1) ?? null;
+}
+
 export function resultFor(cap: RpcCapture, method: string) {
   const req = findSent(cap, method);
   if (!req || req.id === undefined) return null;
@@ -72,7 +78,9 @@ export async function assertExtOk(cap: RpcCapture, method: string) {
 }
 
 export async function fillDock(page: Page, secret: string, ws = WS) {
-  await page.goto("/");
+  await page.goto("/?noconnect=1");
+  await page.locator("#btn-settings").click();
+  await expect(page.locator("#settings-modal")).toBeVisible();
   await page.locator("#ws-url").click();
   await page.locator("#ws-url").fill(ws);
   await page.locator("#secret").click();
@@ -81,14 +89,24 @@ export async function fillDock(page: Page, secret: string, ws = WS) {
   await page.locator("#cwd").fill(CWD);
 }
 
+export async function closeSettings(page: Page) {
+  if (await page.locator("#settings-modal").isVisible()) {
+    await page.locator("#btn-settings-close").click();
+    await expect(page.locator("#settings-modal")).toBeHidden();
+  }
+}
+
 export async function connectWelcome(page: Page) {
   await page.locator("#btn-connect").click();
   await expect(page.locator("#conn-label")).toHaveText("已连接", { timeout: 90_000 });
+  await closeSettings(page);
   await expect(page.locator("#welcome")).toBeVisible({ timeout: 30_000 });
 }
 
 export function backupAuth() {
-  if (existsSync(AUTH_PATH)) copyFileSync(AUTH_PATH, AUTH_BAK);
+  if (!existsSync(AUTH_PATH)) return;
+  mkdirSync(dirname(AUTH_BAK), { recursive: true });
+  copyFileSync(AUTH_PATH, AUTH_BAK);
 }
 
 export function restoreAuth() {

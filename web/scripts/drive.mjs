@@ -1,7 +1,6 @@
 /**
  * Drive the web client in Chromium: click/type like a person.
  *
- *   grok agent --always-approve --no-leader serve --secret slice0dev
  *   npm run dev
  *   npm run drive
  */
@@ -51,7 +50,9 @@ async function shot(name, target = page) {
 }
 
 async function fillDock(target, secret) {
-  await target.goto(BASE);
+  await target.goto(`${BASE}/?noconnect=1`);
+  await target.locator("#btn-settings").click();
+  await target.locator("#settings-modal").waitFor({ state: "visible" });
   await target.locator("#ws-url").click();
   await target.locator("#ws-url").fill("");
   await target.keyboard.type(WS, { delay: 8 });
@@ -61,6 +62,7 @@ async function fillDock(target, secret) {
   await target.locator("#cwd").click();
   await target.locator("#cwd").fill("");
   await target.keyboard.type(CWD, { delay: 6 });
+  await target.locator("#btn-settings-close").click();
 }
 
 async function waitConnected(target) {

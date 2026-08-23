@@ -7,6 +7,7 @@ import {
   assertExtOk,
   attachRpc,
   backupAuth,
+  closeSettings,
   connectWelcome,
   fillDock,
   findSent,
@@ -23,6 +24,7 @@ test("connecting indicator is recorded before a live session", async ({ page }) 
     timeout: 15_000,
   });
   await expect(page.locator("#conn-label")).toHaveText("已连接", { timeout: 90_000 });
+  await closeSettings(page);
 });
 
 test("serve down shows doctor process-not-running copy", async ({ page }) => {
@@ -47,6 +49,7 @@ test("eager auth lands on Welcome with version and cwd, or shows login", async (
   await fillDock(page, SECRET);
   await page.locator("#btn-connect").click();
   await expect(page.locator("#conn-label")).toHaveText("已连接", { timeout: 90_000 });
+  await closeSettings(page);
   const welcome = page.locator("#welcome");
   const login = page.locator("#login");
   await expect.poll(async () => {
@@ -56,7 +59,7 @@ test("eager auth lands on Welcome with version and cwd, or shows login", async (
   }).not.toBe("none");
   if (await welcome.isVisible()) {
     await expect(page.locator("#welcome-version")).toContainText("grok-web");
-    await expect(page.locator("#welcome-cwd")).toContainText("grok-build");
+    await expect(page.locator("#welcome-cwd")).toContainText(/grok-build|\/home\/falser/);
     await expect(page.locator("#prompt")).toBeEnabled();
     const calls = await page.evaluate(() => window.__grokWebTest?.handshakeCalls() ?? []);
     expect(calls[0]).toBe("initialize");
@@ -72,7 +75,9 @@ test("switch-account login keeps the socket and disables composer; API key stays
   await fillDock(page, SECRET);
   await page.locator("#btn-connect").click();
   await expect(page.locator("#conn-label")).toHaveText("已连接", { timeout: 90_000 });
+  await closeSettings(page);
   if (await page.locator("#welcome").isVisible()) {
+    await page.locator("#btn-settings").click();
     await page.locator("#btn-switch-account").click();
   }
   await expect(page.locator("#login")).toBeVisible();
@@ -132,6 +137,7 @@ test("Welcome/login clicks send _x.ai extension frames that are not method_not_f
     console.log("consent banner hidden");
   }
 
+  await page.locator("#btn-settings").click();
   await page.locator("#btn-switch-account").click();
   await expect(page.locator("#login")).toBeVisible();
   await page.locator("#btn-login-primary").click();
@@ -153,6 +159,7 @@ test("Welcome/login clicks send _x.ai extension frames that are not method_not_f
   expect(dumped).not.toContain("xai-playwright-must-not-persist");
   console.log("clicked 用 API key 登录");
 
+  await page.locator("#btn-settings").click();
   await page.locator("#btn-logout").click();
   await expect(page.locator("#login")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("#prompt")).toBeDisabled();

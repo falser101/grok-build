@@ -2,12 +2,12 @@
 
 | ID | 功能点 | TUI | Web 怎么做 | Web 已实现 |
 |---|---|---|---|---|
-| V-01 | 主题 GrokNight | 默认暗，16/256 可量化 | CSS 变量映射槽 | 否 |
-| V-02 | 主题 GrokDay | 亮 | `prefers-color-scheme` 或手动 | 否 |
+| V-01 | 主题 GrokNight | 默认暗，16/256 可量化 | CSS 变量映射槽 | 部分：深色 token |
+| V-02 | 主题 GrokDay | 亮 | `prefers-color-scheme` 或手动 | 是（浅色 token） |
 | V-03 | TokyoNight | 需 truecolor | Web 真彩无压力 | 否 |
 | V-04 | Rose Pine Moon | 需 truecolor | 同 | 否 |
 | V-05 | Oscura Midnight | 需 truecolor | 同 | 否 |
-| V-06 | theme=auto | 跟 OS：macOS/Linux portal/Windows；SSH `GROK_APPEARANCE`/`LC_*`；OSC 11 | `prefers-color-scheme` + 手动覆盖 | 否 |
+| V-06 | theme=auto | 跟 OS：macOS/Linux portal/Windows；SSH `GROK_APPEARANCE`/`LC_*`；OSC 11 | `prefers-color-scheme` + 手动覆盖 | 是（默认跟随系统，设置可锁深色/浅色） |
 | V-07 | auto_dark/light_theme | 映射具体主题 | 设置两套 | 否 |
 | V-08 | `/theme` 预览 | 箭头即时预览，Esc 还原 | 悬停预览 | 否 |
 | V-09 | GROK_THEME env | 强制 | Web 用 localStorage | 否 |
@@ -44,7 +44,7 @@
 | V-40 | collapsed_edit_blocks | | T-08 | 否 |
 | V-41 | display_refresh_auto_cadence | 高刷 >60Hz；restart；Minimal 藏 | `requestAnimationFrame` 即可 | 否 |
 | V-42 | Doctor 颜色级别 | 报告 truecolor/256/16 | Web 总是真彩 | 否（N/A） |
-| V-43 | 系统外观轮询 5s | 桌面 API | matchMedia listener 一次即可 | 否 |
+| V-43 | 系统外观轮询 5s | 桌面 API | matchMedia listener 一次即可 | 是（matchMedia change） |
 | V-44 | wrap ssh 传 LC_GROK_APPEARANCE | SSH 主题 | N/A | 否（N/A） |
 | V-45 | 小屏自动 compact | 20 行 | 窄视口 media query | 否 |
 | V-46 | `contextual_hints.small_screen` | tip | 可做 | 否 |

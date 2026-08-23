@@ -1,11 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
+import { closeSettings } from "./helpers";
 
 const SECRET = process.env.GROK_WEB_SECRET ?? "slice0dev";
 const WS = process.env.GROK_WEB_WS ?? "ws://127.0.0.1:2419/ws";
 const CWD = process.env.GROK_WEB_CWD ?? "/home/falser/Projects/grok-build";
 
 async function fillDock(page: Page, secret: string) {
-  await page.goto("/");
+  await page.goto("/?noconnect=1");
+  await page.locator("#btn-settings").click();
+  await expect(page.locator("#settings-modal")).toBeVisible();
   await page.locator("#ws-url").click();
   await page.locator("#ws-url").fill(WS);
   await page.locator("#secret").click();
@@ -18,6 +21,7 @@ async function waitConnected(page: Page) {
   await expect(page.locator("#conn-label")).toHaveText("已连接", {
     timeout: 90_000,
   });
+  await closeSettings(page);
 }
 
 async function waitAuthedComposer(page: Page) {
@@ -34,7 +38,7 @@ async function ensureSession(page: Page) {
   await waitAuthedComposer(page);
   const label = (await page.locator("#session-label").innerText()).trim();
   if (label === "无 session") {
-    await page.locator("#btn-welcome-new").click();
+    await page.locator("#btn-new").click();
     await expect(page.locator("#session-label")).not.toHaveText("无 session", {
       timeout: 30_000,
     });
@@ -64,8 +68,8 @@ function isSessionCancelNotification(raw: string): boolean {
 test.describe.configure({ mode: "serial" });
 
 test("loads the slice 0 shell", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.locator("h1")).toHaveText("Grok Web");
+  await page.goto("/?noconnect=1");
+  await expect(page.locator("h1")).toHaveText("Grok");
   await expect(page.locator("#conn-label")).toHaveText("未连接");
   await expect(page.locator("#thread .empty")).toBeVisible();
   await expect(page.locator("#prompt")).toBeDisabled();
@@ -110,6 +114,8 @@ test("connects, reconnects after a drop, then a second tab steals the stream", a
   });
   await expect(page.locator("#banner")).toHaveAttribute("data-reason", "stolen");
 
+  await page2.locator("#btn-settings").click();
+  await expect(page2.locator("#settings-modal")).toBeVisible();
   await page2.locator("#btn-disconnect").click();
   await expect(page2.locator("#conn-label")).toHaveText("已断开");
   await page2.close();
@@ -148,6 +154,8 @@ test("disconnect while generating sends a no-id session/cancel notification", as
   );
   await page.locator("#btn-send").click();
   await expect(page.locator("#hint")).toHaveText("生成中", { timeout: 15_000 });
+  await page.locator("#btn-settings").click();
+  await expect(page.locator("#settings-modal")).toBeVisible();
   await page.locator("#btn-disconnect").click();
   await expect(page.locator("#conn-label")).toHaveText("已断开");
 

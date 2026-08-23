@@ -2,9 +2,9 @@
 
 | ID | 功能点 | TUI | Web 怎么做 | Web 已实现 |
 |---|---|---|---|---|
-| X-01 | 子 agent 生成 | `SubagentSpawned` 在 parent 通道，先于 child prompt | 父时间线一行 + 可展开 | 否 |
-| X-02 | 子 agent 进度 | `SubagentProgress` ~2s：turns、tools、tokens、errors | 进度条 | 否 |
-| X-03 | 子 agent 结束 | `SubagentFinished` completed/failed/cancelled + output | 结果折叠 | 否 |
+| X-01 | 子 agent 生成 | `SubagentSpawned` 在 parent 通道，先于 child prompt | 父时间线一行 + 可展开 | 部分：父时间线一行（类型徽章 + 描述） |
+| X-02 | 子 agent 进度 | `SubagentProgress` ~2s：turns、tools、tokens、errors | 进度条 | 部分：同一 childSessionId 就地写 activity |
+| X-03 | 子 agent 结束 | `SubagentFinished` completed/failed/cancelled + output | 结果折叠 | 部分：同一行改 status；无输出折叠 |
 | X-04 | 点进子会话 | 映射 child_session_id | 抽屉 load 子 session（只读或可跟） | 否 |
 | X-05 | 取消子 agent | `x.ai/subagent/cancel`；取消面板选项 | 按钮 | 否 |
 | X-06 | capability_mode | read-only 等 | 徽章 | 否 |
@@ -29,13 +29,13 @@
 | X-25 | workflow pause/resume/stop/save | 显示名非内部 id | 详情键 p/r/x/s | 否 |
 | X-26 | budget 限制 resume | 不能裸 resume；要更高 agent_budget | 错误文案原样展示 | 否 |
 | X-27 | `/workflows` 面板 | 运行中+保留；非定义目录 | 表：phase、roster、progress | 否 |
-| X-28 | WorkflowUpdated | 全量快照 revision | 按 revision 丢旧 | 否 |
+| X-28 | WorkflowUpdated | 全量快照 revision | 按 revision 丢旧 | 部分：同 runId 就地更新阶段条；无 revision 丢弃 |
 | X-29 | 并行 cap | 默认同时 32 子；逻辑预算 128 | 展示 remaining | 否 |
 | X-30 | foreground workflow | 字段 | 阻塞 UI vs 后台 | 否 |
 | X-31 | `x.ai/workflows/list` | 拉列表 | 打开面板时调 | 否 |
 | X-32 | watching 状态 | 有后台时 turn 完仍 watching | 状态行 | 否 |
-| X-33 | 取消 turn 留子 agent | B-13 选项 | 同 | 否 |
-| X-34 | 子 agent 类型 explore/plan/general | | 图标 | 否 |
+| X-33 | 取消 turn 留子 agent | B-13 选项 | 同 | 是（B-13 四项里的「留子 agent」） |
+| X-34 | 子 agent 类型 explore/plan/general | | 图标 | 部分：类型徽章文字 |
 | X-35 | worktree 隔离子 agent | Agent 侧 | 徽章「wt」 | Agent 已有 |
 | X-36 | `will_wake` 字段 | TUI 不再消费；保留兼容 | 可忽略或「将自动继续」 | 否 |
 | X-37 | `/tasks` | 打开任务面板 | 路由 | 否 |

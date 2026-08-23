@@ -4,11 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
+    "dev:vite": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "drive": "node scripts/drive.mjs",
-    "test": "node --experimental-strip-types --test src/protocol.test.ts src/startup.test.ts",
+    "test": "node --experimental-strip-types --test src/protocol.test.ts src/startup.test.ts src/session_ops.test.ts src/markdown.test.ts src/conversation.test.ts src/conversation_view.test.ts src/composer.test.ts src/highlight.test.ts src/theme.test.ts src/tool_blocks.test.ts src/blocking_cards.test.ts",
     "test:e2e": "playwright test"
   },
   "devDependencies": {

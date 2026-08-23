@@ -697,6 +697,7 @@ export class ConversationTimeline {
             args: item.argText,
             streaming: isBusyToolStatus(item.status ?? ""),
           });
+          if (!item.manualFold && isBusyToolStatus(item.status ?? "") && item.argText) item.open = true;
           if (rawTitle) {
             const nextFamily =
               family !== "other" ? family : toolFamily(item.toolKind ?? "", rawTitle);
@@ -740,7 +741,7 @@ export class ConversationTimeline {
       argText: argChunk,
       elapsedMs: elapsedHint ?? undefined,
       raw: body || displayTitle,
-      open: family === "edit",
+      open: family === "edit" || (family !== "skill" && isBusyToolStatus(status) && Boolean(argChunk)),
       hook: hookFrom(update, rec),
       source: update,
       path: pathFromUpdate(update) ?? undefined,

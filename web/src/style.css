@@ -1114,6 +1114,17 @@ button:disabled {
   white-space: pre-wrap;
   font-size: 0.82rem;
 }
+.bubble.tool[data-family="skill"] {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.tool-skill-line {
+  color: var(--muted);
+  font-size: 0.78rem;
+  padding: 0.08rem 0;
+}
+
 .tool-line[data-blocked="1"] {
   color: var(--edit);
 }

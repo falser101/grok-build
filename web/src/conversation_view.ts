@@ -285,6 +285,13 @@ function fillTool(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
   const family = item.members?.[0]?.family ?? "";
   if (family) el.dataset.family = family;
   if (item.status) el.dataset.status = item.status;
+  if (family === "skill") {
+    const row = document.createElement("div");
+    row.className = "tool-skill-line";
+    row.textContent = item.title || "使用了 skill";
+    el.append(row);
+    return;
+  }
   const busy = isBusyToolStatus(item.status ?? "");
   const blocked = isBlockedToolStatus(item.status ?? "");
   const line = document.createElement("button");
@@ -306,7 +313,7 @@ function fillTool(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
     const elapsed = formatToolElapsed(item.elapsedMs);
     if (elapsed) bits.push(elapsed);
   }
-  meta.textContent = bits.join(" · ");
+  meta.textContent = bits.join(" ");
   if (meta.textContent) line.append(meta);
   if (busy) line.dataset.busy = "1";
   if (blocked) line.dataset.blocked = "1";

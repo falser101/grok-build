@@ -689,7 +689,7 @@ function argSnapshot(update: { [k: string]: Json }): string {
 
 export function formatToolArgsHtml(args: string, streaming: boolean): string {
   if (!args) return "";
-  const text = streaming ? args : prettyToolArgs(args);
+  const text = streaming ? `${args}|` : prettyToolArgs(args);
   return `<pre class="tool-args">${escapePre(text)}</pre>`;
 }
 

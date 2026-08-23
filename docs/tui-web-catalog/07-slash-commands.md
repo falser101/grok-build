@@ -9,7 +9,7 @@ Pager 会先拦截同名。Web 必须自己实现所有 **P**，**S** 发给 Age
 
 可见性：Minimal 隐藏 dashboard/find/jump/timeline/theme/tutorial/workflows；全屏隐藏 expand/edit-prompt。
 
-Web 菜单徽章：本地 pager = **P**（描边），`availableCommands` 内置 = **S**（浅蓝底），`user:`/`plugin:`/`local:` skill = **skill**（灰底，显示 `scope:name`）。输入 `/` 时在 composer 上方模糊补全；选中行左侧 accent 条。`/help` 是会话内卡片，不是外站。
+Web 菜单徽章：本地 pager = **P**（描边），`availableCommands` 内置 = **S**（浅蓝底），`user:`/`plugin:`/`local:` skill = **skill**（灰底，显示 `scope:name`）。输入 `/` 时在 composer 上方模糊补全；选中行左侧 accent 条。Tab 只补全进输入框，Enter 才执行。`/help` 是会话内卡片，不是外站。
 
 ## Pager 本地
 

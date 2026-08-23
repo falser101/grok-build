@@ -70,6 +70,7 @@ export type ComposerKeyAction =
   | "slash-next"
   | "slash-prev"
   | "slash-accept"
+  | "slash-complete"
   | "slash-close"
   | "clear-draft"
   | "accept-ghost"
@@ -102,7 +103,7 @@ export function mapComposerKey(
   if (state.ghost && key === "Tab" && !state.slashOpen && !state.atOpen) return "accept-ghost";
   if (state.slashOpen && key === "ArrowDown") return "slash-next";
   if (state.slashOpen && key === "ArrowUp") return "slash-prev";
-  if (state.slashOpen && key === "Tab") return "slash-accept";
+  if (state.slashOpen && key === "Tab") return "slash-complete";
   if (state.slashOpen && key === "Enter" && !mods.shift) return "slash-accept";
   if (state.historyOpen && key === "ArrowDown") return "history-next";
   if (state.historyOpen && key === "ArrowUp") return "history-prev";

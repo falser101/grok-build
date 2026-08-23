@@ -198,3 +198,15 @@ test("composer chrome labels and model state parse", () => {
   assert.equal(parsed.effort, "high");
   assert.equal(parsed.models[0]?.supportsEffort, true);
 });
+
+
+test("slash Tab completes, Enter accepts", () => {
+  const open = {
+    enterSends: true,
+    promptEmpty: false,
+    slashOpen: true,
+    historyOpen: false,
+  };
+  assert.equal(mapComposerKey("Tab", none, open), "slash-complete");
+  assert.equal(mapComposerKey("Enter", none, open), "slash-accept");
+});

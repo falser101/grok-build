@@ -3494,6 +3494,13 @@ promptEl.addEventListener("keydown", (ev) => {
       renderSlashMenu();
     }
   }
+  if (action === "slash-complete") {
+    if (slashPicker.hidden && slashItems[slashIndex]) {
+      promptEl.value = applySlashAccept(promptEl.value, slashItems[slashIndex]!);
+      hidePopovers();
+      promptEl.focus();
+    }
+  }
   if (action === "slash-accept") {
     if (!slashPicker.hidden && pickerItems[pickerIndex]) acceptPicker(pickerItems[pickerIndex]!);
     else if (slashItems[slashIndex]) acceptSlash(slashItems[slashIndex]!);

@@ -79,6 +79,7 @@ export type ComposerKeyAction =
   | "at-accept"
   | "mode-shell"
   | "mode-remember"
+  | "cycle-mode"
   | "none";
 
 export function mapComposerKey(
@@ -104,6 +105,7 @@ export function mapComposerKey(
   if (state.slashOpen && key === "ArrowDown") return "slash-next";
   if (state.slashOpen && key === "ArrowUp") return "slash-prev";
   if (state.slashOpen && key === "Tab") return "slash-complete";
+  if (key === "Tab" && mods.shift && !state.slashOpen && !state.atOpen) return "cycle-mode";
   if (state.slashOpen && key === "Enter" && !mods.shift) return "slash-accept";
   if (state.historyOpen && key === "ArrowDown") return "history-next";
   if (state.historyOpen && key === "ArrowUp") return "history-prev";

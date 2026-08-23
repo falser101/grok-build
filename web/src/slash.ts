@@ -27,6 +27,7 @@ export type LocalAction =
   | "model"
   | "effort"
   | "always-approve"
+  | "plan"
   | "auto"
   | "multiline"
   | "compact-mode"
@@ -131,6 +132,7 @@ const LOCAL_ACTIONS = new Set<string>([
   "model",
   "effort",
   "always-approve",
+  "plan",
   "auto",
   "multiline",
   "compact-mode",
@@ -219,6 +221,7 @@ export const LOCAL_SLASH: SlashCommand[] = [
   { name: "m", description: "切换模型", argumentHint: "id" },
   { name: "effort", description: "思考强度", argumentHint: "low|medium|high|xhigh" },
   { name: "always-approve", description: "始终允许工具", argumentHint: null },
+  { name: "plan", description: "进出 Plan 模式", argumentHint: null },
   { name: "yolo", description: "始终允许工具", argumentHint: null },
   { name: "auto", description: "自动权限模式", argumentHint: null },
   { name: "multiline", description: "开关多行输入", argumentHint: null },

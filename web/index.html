@@ -383,7 +383,12 @@
               <div id="at-menu" hidden role="listbox"></div>
             </div>
             <div class="composer-toolbar-end">
-              <button type="button" id="btn-permission-chip">每次询问</button>
+              <div id="mode-seg" class="mode-seg" role="tablist" aria-label="权限档">
+                <button type="button" data-mode="ask" aria-selected="true">普通</button>
+                <button type="button" data-mode="plan" aria-selected="false">Plan</button>
+                <button type="button" data-mode="yolo" aria-selected="false">YOLO</button>
+              </div>
+              <button type="button" id="btn-permission-chip" hidden>每次询问</button>
               <button type="button" id="btn-model-chip">模型</button>
               <button type="button" id="btn-effort-chip">思考</button>
               <button type="button" id="btn-interject" hidden>插入</button>

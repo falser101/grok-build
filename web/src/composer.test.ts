@@ -210,3 +210,24 @@ test("slash Tab completes, Enter accepts", () => {
   assert.equal(mapComposerKey("Tab", none, open), "slash-complete");
   assert.equal(mapComposerKey("Enter", none, open), "slash-accept");
 });
+
+test("Shift+Tab cycles session mode when slash closed", () => {
+  assert.equal(
+    mapComposerKey("Tab", { ...none, shift: true }, {
+      enterSends: true,
+      promptEmpty: false,
+      slashOpen: false,
+      historyOpen: false,
+    }),
+    "cycle-mode",
+  );
+  assert.equal(
+    mapComposerKey("Tab", { ...none, shift: true }, {
+      enterSends: true,
+      promptEmpty: false,
+      slashOpen: true,
+      historyOpen: false,
+    }),
+    "slash-complete",
+  );
+});

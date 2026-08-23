@@ -3910,3 +3910,37 @@ html[data-compact="1"] #sidebar #btn-new {
   font-size: 0.84rem;
   padding: 0.8rem 0.75rem;
 }
+
+.mode-seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.mode-seg button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.18rem 0.55rem;
+  cursor: pointer;
+}
+.mode-seg button[aria-selected="true"] {
+  background: var(--bg-2);
+  color: var(--ink);
+}
+.mode-seg button[data-mode="yolo"][aria-selected="true"] {
+  background: color-mix(in srgb, #c2410c 22%, var(--bg));
+  color: #c2410c;
+}
+#header-yolo[data-on="1"] {
+  background: color-mix(in srgb, #c2410c 18%, var(--bg));
+  border-color: #c2410c;
+  color: #c2410c;
+  font-weight: 700;
+}
+#header-yolo[data-on="1"]::before {
+  content: "! ";
+}

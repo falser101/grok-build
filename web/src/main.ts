@@ -89,6 +89,15 @@ import {
 } from "./composer";
 import { applyTheme, loadThemePref, persistThemePref } from "./theme";
 import {
+  buildSetModeParams,
+  cycleSessionMode,
+  parseCurrentModeUpdate,
+  parseSessionPermMode,
+  parseShowPlanChip,
+  planChipVisible,
+  type SessionPermMode,
+} from "./session_mode";
+import {
   HELP_SHORTCUTS,
   buildPaletteItems,
   closeDialog,
@@ -237,6 +246,8 @@ const btnSend = $<HTMLButtonElement>("btn-send");
 const btnAttach = $<HTMLButtonElement>("btn-attach");
 const filePick = $<HTMLInputElement>("file-pick");
 const btnPermissionChip = $<HTMLButtonElement>("btn-permission-chip");
+const modeSeg = $("mode-seg");
+
 const btnModelChip = $<HTMLButtonElement>("btn-model-chip");
 const btnEffortChip = $<HTMLButtonElement>("btn-effort-chip");
 const composerMenu = $("composer-menu");
@@ -356,6 +367,9 @@ let reconnectTimer: number | null = null;
 let reconnectAttempt = 0;
 let turnRunning = false;
 let yoloMode = false;
+let sessionPermMode: SessionPermMode = "ask";
+let showPlanChip: boolean | null = null;
+
 let autoMode = false;
 let currentModelId = "";
 let currentModelName = "";
@@ -1314,20 +1328,59 @@ function syncComposerChips() {
 
 function syncHeaderChips() {
   btnHeaderModel.textContent = currentModelName || "模型";
+  const yoloOn = sessionPermMode === "yolo" || yoloMode;
   headerYolo.hidden = false;
-  headerYolo.dataset.on = yoloMode ? "1" : "0";
+  headerYolo.dataset.on = yoloOn ? "1" : "0";
+  headerYolo.dataset.danger = yoloOn ? "1" : "0";
   headerYolo.textContent = "YOLO";
-  const planOn = !planNudge.hidden || Boolean(planBadge.textContent?.trim());
-  headerPlan.hidden = false;
-  headerPlan.dataset.on = planOn ? "1" : "0";
+  const inPlan = sessionPermMode === "plan";
+  headerPlan.hidden = !planChipVisible({ inPlan, showPlanChip });
+  headerPlan.dataset.on = inPlan ? "1" : "0";
   headerPlan.textContent = "plan";
+  planNudge.hidden = !inPlan;
+  if (modeSeg) {
+    for (const btn of modeSeg.querySelectorAll<HTMLButtonElement>("button[data-mode]")) {
+      btn.setAttribute("aria-selected", btn.dataset.mode === sessionPermMode ? "true" : "false");
+    }
+  }
   if (!headerContext.textContent?.includes("%")) headerContext.textContent = "上下文 —%";
+}
+
+async function setSessionMode(next: SessionPermMode) {
+  const prev = sessionPermMode;
+  sessionPermMode = next;
+  if (next === "yolo") {
+    setYoloMode(true);
+  } else if (yoloMode) {
+    setYoloMode(false);
+  }
+  if (sessionId && acp.connected && (next === "plan" || prev === "plan")) {
+    try {
+      await acpCall("session/set_mode", buildSetModeParams(sessionId, next));
+    } catch (e) {
+      showBanner(e instanceof Error ? e.message : String(e), "plan");
+    }
+  }
+  syncComposerChips();
+}
+
+function cycleComposerMode() {
+  void setSessionMode(cycleSessionMode(sessionPermMode));
 }
 
 function applyContextUsage(raw: Json) {
   const usage = parseContextUsage(raw);
   headerContext.hidden = false;
   headerContext.textContent = contextChipText(usage);
+  const chip = parseShowPlanChip(raw);
+  if (chip != null) showPlanChip = chip;
+  const bag =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as { [k: string]: unknown })
+      : null;
+  const mode = parseSessionPermMode(bag?.permission_mode ?? bag?.permissionMode);
+  if (mode === "plan" || mode === "yolo") sessionPermMode = mode;
+  syncHeaderChips();
 }
 
 function writeSessionHash() {
@@ -1540,6 +1593,16 @@ acp.onRequest = async (req) => {
   if (req.method === "x.ai/exit_plan_mode") {
     return await blockHost.offerPlan(req.params);
   }
+  if (req.method === "x.ai/enter_plan_mode" || req.method === "enter_plan_mode") {
+    const rec = asRecord(req.params) ?? {};
+    if (!rec.planContent && !rec.plan_content) {
+      rec.planContent = "Agent 请求进入 Plan mode。";
+    }
+    const out = await blockHost.offerPlan(rec);
+    const recOut = asRecord(out);
+    if (recOut?.outcome === "approved") void setSessionMode("plan");
+    return out;
+  }
   handleAgentEvent(req.method, req.params);
   return {};
 };
@@ -1645,6 +1708,15 @@ function handleAgentEvent(method: string, params: Json) {
     const rec = asRecord(params);
     const update = asRecord((rec?.update as Json) ?? rec);
     const kind = typeof update?.sessionUpdate === "string" ? update.sessionUpdate : "";
+    if (kind === "current_mode_update" || kind === "mode_update") {
+      const next = parseCurrentModeUpdate(update ?? params);
+      if (next) {
+        sessionPermMode = next;
+        if (next === "yolo") setYoloMode(true);
+        else if (yoloMode) setYoloMode(false);
+        syncComposerChips();
+      }
+    }
     if (kind === "model_changed" || kind === "model_auto_switched") {
       const id =
         (typeof update?.modelId === "string" && update.modelId) ||
@@ -2808,8 +2880,13 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
   if (name === "always-approve") {
     const next = !yoloMode;
     if (next && !window.confirm("此后本会话的工具不再询问。确定？")) return true;
-    setYoloMode(next);
+    await setSessionMode(next ? "yolo" : sessionPermMode === "plan" ? "plan" : "ask");
     await sendPrompt(next ? "/always-approve" : "/always-approve off");
+    return true;
+  }
+  if (name === "plan") {
+    const next = sessionPermMode === "plan" ? "ask" : "plan";
+    await setSessionMode(next);
     return true;
   }
   if (name === "auto") {
@@ -3734,10 +3811,15 @@ btnHeaderModel.addEventListener("click", (ev) => {
   void openHeaderModelMenu();
 });
 headerYolo.addEventListener("click", () => {
-  void runLocalSlash({ name: "always-approve", args: "" });
+  void setSessionMode(sessionPermMode === "yolo" ? "ask" : "yolo");
 });
 headerPlan.addEventListener("click", () => {
-  headerPlan.dataset.on = headerPlan.dataset.on === "1" ? "0" : "1";
+  void setSessionMode(sessionPermMode === "plan" ? "ask" : "plan");
+});
+modeSeg.addEventListener("click", (ev) => {
+  const btn = ev.target instanceof HTMLElement ? ev.target.closest("button[data-mode]") : null;
+  const mode = btn?.getAttribute("data-mode");
+  if (mode === "ask" || mode === "plan" || mode === "yolo") void setSessionMode(mode);
 });
 headerContext.addEventListener("click", () => {
   const entry = currentEntry();
@@ -4442,6 +4524,11 @@ promptEl.addEventListener("keydown", (ev) => {
       ghost: ghostText,
     },
   );
+  if (action === "cycle-mode") {
+    ev.preventDefault();
+    cycleComposerMode();
+    return;
+  }
   if (action === "none") return;
   ev.preventDefault();
   if (action === "newline") {

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildSetModeParams,
   cycleSessionMode,
+  keepLocalYolo,
   parseCurrentModeUpdate,
   parseSessionPermMode,
   parseShowPlanChip,
@@ -38,4 +39,10 @@ test("parse mode from updates", () => {
     parseCurrentModeUpdate({ sessionUpdate: "current_mode_update", modeId: "plan" }),
     "plan",
   );
+});
+
+test("ACP default does not drop YOLO", () => {
+  assert.equal(keepLocalYolo("yolo", "ask"), "yolo");
+  assert.equal(keepLocalYolo("plan", "ask"), "ask");
+  assert.equal(keepLocalYolo("yolo", "plan"), "plan");
 });

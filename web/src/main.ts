@@ -91,6 +91,7 @@ import { applyTheme, loadThemePref, persistThemePref } from "./theme";
 import {
   buildSetModeParams,
   cycleSessionMode,
+  keepLocalYolo,
   parseCurrentModeUpdate,
   parseSessionPermMode,
   parseShowPlanChip,
@@ -1361,6 +1362,8 @@ async function setSessionMode(next: SessionPermMode) {
       showBanner(e instanceof Error ? e.message : String(e), "plan");
     }
   }
+  sessionPermMode = next;
+  if (next === "yolo") setYoloMode(true);
   syncComposerChips();
 }
 
@@ -1711,8 +1714,8 @@ function handleAgentEvent(method: string, params: Json) {
     if (kind === "current_mode_update" || kind === "mode_update") {
       const next = parseCurrentModeUpdate(update ?? params);
       if (next) {
-        sessionPermMode = next;
-        if (next === "yolo") setYoloMode(true);
+        sessionPermMode = keepLocalYolo(sessionPermMode, next);
+        if (sessionPermMode === "yolo") setYoloMode(true);
         else if (yoloMode) setYoloMode(false);
         syncComposerChips();
       }

@@ -2,6 +2,11 @@ export type SessionPermMode = "ask" | "plan" | "yolo";
 
 export const SESSION_MODES: SessionPermMode[] = ["ask", "plan", "yolo"];
 
+export function keepLocalYolo(current: SessionPermMode, remote: SessionPermMode): SessionPermMode {
+  if (current === "yolo" && remote === "ask") return "yolo";
+  return remote;
+}
+
 export function cycleSessionMode(current: SessionPermMode): SessionPermMode {
   const i = SESSION_MODES.indexOf(current);
   return SESSION_MODES[(i + 1) % SESSION_MODES.length]!;

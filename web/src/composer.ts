@@ -101,11 +101,11 @@ export function mapComposerKey(
   if (state.atOpen && key === "ArrowDown") return "at-next";
   if (state.atOpen && key === "ArrowUp") return "at-prev";
   if (state.atOpen && (key === "Tab" || (key === "Enter" && !mods.shift))) return "at-accept";
+  if (key === "Tab" && mods.shift && !state.slashOpen && !state.atOpen) return "cycle-mode";
   if (state.ghost && key === "Tab" && !state.slashOpen && !state.atOpen) return "accept-ghost";
   if (state.slashOpen && key === "ArrowDown") return "slash-next";
   if (state.slashOpen && key === "ArrowUp") return "slash-prev";
   if (state.slashOpen && key === "Tab") return "slash-complete";
-  if (key === "Tab" && mods.shift && !state.slashOpen && !state.atOpen) return "cycle-mode";
   if (state.slashOpen && key === "Enter" && !mods.shift) return "slash-accept";
   if (state.historyOpen && key === "ArrowDown") return "history-next";
   if (state.historyOpen && key === "ArrowUp") return "history-prev";

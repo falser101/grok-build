@@ -231,3 +231,16 @@ test("Shift+Tab cycles session mode when slash closed", () => {
     "slash-complete",
   );
 });
+
+test("ghost does not eat Shift+Tab", () => {
+  assert.equal(
+    mapComposerKey("Tab", { ...none, shift: true }, {
+      enterSends: true,
+      promptEmpty: false,
+      slashOpen: false,
+      historyOpen: false,
+      ghost: "/plan",
+    }),
+    "cycle-mode",
+  );
+});

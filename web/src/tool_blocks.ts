@@ -71,11 +71,12 @@ export function asToolFamily(value: string): ToolFamily {
   return FAMILY_ORDER.includes(value as ToolFamily) ? (value as ToolFamily) : "other";
 }
 
-export function toolFamily(kind: string, title: string, name = ""): ToolFamily {
+export function toolFamily(kind: string, title: string, name = "", metaKind = ""): ToolFamily {
   const k = kind.toLowerCase();
   const t = title.toLowerCase();
   const n = name.toLowerCase();
-  const blob = `${k} ${t} ${n}`;
+  const mk = metaKind.toLowerCase();
+  const blob = `${k} ${t} ${n} ${mk}`;
   if (
     k.includes("exec") ||
     k.includes("bash") ||
@@ -110,6 +111,9 @@ export function toolFamily(kind: string, title: string, name = ""): ToolFamily {
     k.includes("glob") ||
     n.includes("grep") ||
     n.includes("glob") ||
+    n.includes("grep_files") ||
+    n.includes("x_search") ||
+    mk === "search" ||
     titleHasVerb(t, "search") ||
     titleHasVerb(t, "grep") ||
     k === "search"
@@ -119,7 +123,7 @@ export function toolFamily(kind: string, title: string, name = ""): ToolFamily {
   if (k.includes("list") || n.includes("list_dir") || titleHasVerb(t, "list")) {
     return "list";
   }
-  if (blob.includes("web_search") || blob.includes("x_search") || t.includes("web search")) {
+  if ((blob.includes("web_search") || t.includes("web search")) && !n.includes("x_search")) {
     return "websearch";
   }
   if (blob.includes("web_fetch") || titleHasVerb(t, "fetch") || k.includes("fetch")) {
@@ -149,7 +153,7 @@ export function shortToolLabel(title: string): string {
 export function toolSummary(family: ToolFamily, count: number, title: string): string {
   const label = shortToolLabel(title);
   if (family === "read") return count > 1 ? `读了 ${count} 个文件` : `读取 ${label}`;
-  if (family === "skill") return count > 1 ? `读了 ${count} 个 skill` : `读取 ${label}`;
+  if (family === "skill") return count > 1 ? `使用了 ${count} 个 skill` : `使用了 skill ${label}`;
   if (family === "search") return count > 1 ? `搜索了 ${count} 个模式` : `搜索 ${label}`;
   if (family === "list") return count > 1 ? `列出 ${count} 个目录` : `列出 ${label}`;
   if (family === "fetch") return count > 1 ? `获取了 ${count} 个网页` : `获取 ${label}`;
@@ -507,7 +511,7 @@ export function formatToolHtml(
   kind: string,
   body: string,
   update: { [k: string]: Json },
-  opts: { full?: boolean } = {},
+  opts: { full?: boolean; args?: string; streaming?: boolean } = {},
 ): string {
   const title = str(update.title);
   const name = str(update.name);
@@ -523,7 +527,11 @@ export function formatToolHtml(
     const head = cmd ? `<div class="tool-cmd">$ ${escapePre(cmd)}</div>` : "";
     return `${head}<pre class="tool-output">${ansiToHtml(cut.text)}</pre>${moreButton(cut.omitted, cut.total)}`;
   }
-  if (family === "read" || family === "skill") {
+  if (family === "skill") {
+    const skill = name || shortToolLabel(title);
+    return `<div class="tool-skill">使用了 skill ${escapePre(skill)}</div>`;
+  }
+  if (family === "read") {
     const range = rangeFromUpdate(update);
     const cut = opts.full ? { text: body, omitted: 0, total: body.split("\n").length } : truncateLines(body, READ_FIRST, READ_LAST);
     const lang = langFromPath(path);
@@ -578,7 +586,119 @@ export function formatToolHtml(
   }
   const linked = pathLink(path);
   const cut = opts.full ? { text: body, omitted: 0, total: body.split("\n").length } : truncateLines(body, 10, 3);
-  return `${linked}<pre class="tool-output">${escapePre(cut.text)}</pre>${moreButton(cut.omitted, cut.total)}`;
+  const args = formatToolArgsHtml(opts.args ?? argSnapshot(update), Boolean(opts.streaming));
+  const output = body && body !== title ? `<pre class="tool-output">${escapePre(cut.text)}</pre>${moreButton(cut.omitted, cut.total)}` : "";
+  return `${args}${linked}${output}`;
+}
+
+
+export function toolStatusLabel(status: string): string {
+  const s = status.toLowerCase();
+  if (s === "pending_user" || s === "waiting" || s === "waiting_permission" || s === "blocked") {
+    return "等待你批准";
+  }
+  if (s === "pending" || s === "in_progress" || s === "running") return "运行中";
+  if (s === "completed" || s === "complete" || s === "done" || s === "ok" || s === "success") return "完成";
+  if (s === "failed" || s === "error") return "失败";
+  if (s === "cancelled" || s === "canceled") return "已取消";
+  return status;
+}
+
+export function isBusyToolStatus(status: string): boolean {
+  const s = status.toLowerCase();
+  return s === "pending" || s === "in_progress" || s === "running";
+}
+
+export function isBlockedToolStatus(status: string): boolean {
+  const s = status.toLowerCase();
+  return s === "pending_user" || s === "waiting" || s === "waiting_permission" || s === "blocked";
+}
+
+export function isDoneToolStatus(status: string): boolean {
+  const s = status.toLowerCase();
+  return (
+    s === "completed" ||
+    s === "complete" ||
+    s === "done" ||
+    s === "ok" ||
+    s === "success" ||
+    s === "failed" ||
+    s === "error" ||
+    s === "cancelled" ||
+    s === "canceled"
+  );
+}
+
+export function formatToolElapsed(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  if (ms < 1000) return `${Math.max(1, Math.round(ms))}ms`;
+  const secs = ms / 1000;
+  if (secs < 10) return `${secs.toFixed(1)}s`;
+  return `${Math.round(secs)}s`;
+}
+
+export function prettyToolArgs(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+  try {
+    return JSON.stringify(JSON.parse(trimmed), null, 2);
+  } catch {
+    return text;
+  }
+}
+
+export function mergeArgStream(prev: string, chunk: string): string {
+  if (!chunk) return prev;
+  if (!prev) return chunk;
+  if (prev.trim().startsWith("{") && chunk.trim().startsWith("{")) {
+    try {
+      const a = JSON.parse(prev);
+      const b = JSON.parse(chunk);
+      if (a && typeof a === "object" && b && typeof b === "object") {
+        return JSON.stringify({ ...a, ...b });
+      }
+    } catch {
+      /* append */
+    }
+  }
+  return prev + chunk;
+}
+
+export function argChunkFromUpdate(update: { [k: string]: Json }): string {
+  if (typeof update.delta === "string") return update.delta;
+  if (typeof update.rawInputDelta === "string") return update.rawInputDelta;
+  if (typeof update.raw_input_delta === "string") return update.raw_input_delta;
+  if (typeof update.chunk === "string") return update.chunk;
+  const rec = asRecord(update.content ?? null);
+  if (rec) {
+    if (typeof rec.text === "string" && (rec.type === "raw_input" || rec.type === "input")) return rec.text;
+    if (typeof rec.json === "string") return rec.json;
+  }
+  const raw = update.rawInput ?? update.raw_input;
+  if (typeof raw === "string") return raw;
+  if (raw && typeof raw === "object") return JSON.stringify(raw);
+  return "";
+}
+
+function argSnapshot(update: { [k: string]: Json }): string {
+  const raw = update.rawInput ?? update.raw_input;
+  if (typeof raw === "string") return raw;
+  if (raw && typeof raw === "object") return JSON.stringify(raw);
+  return "";
+}
+
+export function formatToolArgsHtml(args: string, streaming: boolean): string {
+  if (!args) return "";
+  const text = streaming ? args : prettyToolArgs(args);
+  return `<pre class="tool-args">${escapePre(text)}</pre>`;
+}
+
+export function elapsedFromUpdate(update: { [k: string]: Json }): number | null {
+  const raw = update.elapsed_ms ?? update.elapsedMs ?? update.duration_ms ?? update.durationMs ?? update.duration;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw > 0 && raw < 100 ? raw * 1000 : raw;
+  }
+  return null;
 }
 
 export type Phase = { title: string; state: string };

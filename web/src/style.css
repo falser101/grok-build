@@ -1105,6 +1105,15 @@ button:disabled {
   animation: tool-pulse 1s ease-in-out infinite;
 }
 
+.tool-meta {
+  color: var(--muted);
+  font-size: 0.78em;
+}
+.tool-args {
+  margin: 0.25rem 0 0;
+  white-space: pre-wrap;
+  font-size: 0.82rem;
+}
 .tool-line[data-blocked="1"] {
   color: var(--edit);
 }

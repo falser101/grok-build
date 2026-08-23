@@ -1,4 +1,11 @@
 import type { TimelineItem } from "./conversation.ts";
+import {
+  formatToolElapsed,
+  isBlockedToolStatus,
+  isBusyToolStatus,
+  isDoneToolStatus,
+  toolStatusLabel,
+} from "./tool_blocks.ts";
 import { renderMarkdown } from "./markdown.ts";
 import { relativeTime } from "./highlight.ts";
 import { stripImagePlaceholders } from "./protocol.ts";
@@ -278,11 +285,8 @@ function fillTool(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
   const family = item.members?.[0]?.family ?? "";
   if (family) el.dataset.family = family;
   if (item.status) el.dataset.status = item.status;
-  const busy =
-    item.status === "pending" ||
-    item.status === "in_progress" ||
-    item.status === "running";
-  const blocked = item.status === "pending_user" || item.status === "waiting";
+  const busy = isBusyToolStatus(item.status ?? "");
+  const blocked = isBlockedToolStatus(item.status ?? "");
   const line = document.createElement("button");
   line.type = "button";
   line.className = "tool-line";
@@ -292,8 +296,18 @@ function fillTool(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
     badge.textContent = "MCP";
     line.append(badge, document.createTextNode(item.title || "工具"));
   } else {
-    line.textContent = item.title || "工具";
+    line.append(document.createTextNode(item.title || "工具"));
   }
+  const meta = document.createElement("span");
+  meta.className = "tool-meta";
+  const bits: string[] = [];
+  if (item.status) bits.push(toolStatusLabel(item.status));
+  if (item.elapsedMs != null && (isDoneToolStatus(item.status ?? "") || !busy && !blocked)) {
+    const elapsed = formatToolElapsed(item.elapsedMs);
+    if (elapsed) bits.push(elapsed);
+  }
+  meta.textContent = bits.join(" · ");
+  if (meta.textContent) line.append(meta);
   if (busy) line.dataset.busy = "1";
   if (blocked) line.dataset.blocked = "1";
   line.addEventListener("click", (ev) => {

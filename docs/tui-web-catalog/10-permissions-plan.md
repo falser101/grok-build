@@ -6,7 +6,7 @@
 | P-02 | Auto 模式 | LLM classifier；危险仍问或拒。`/auto`、设置。feature 关则无命令。 | `_meta.autoMode` session/new；Shift+Tab 循环 | 否 |
 | P-03 | Always-approve / YOLO | `/always-approve`、Ctrl+O、Shift+Tab。跳过全部提示。deny 规则和 hooks 仍可拦。 | 明确危险徽章 | 是：顶栏 YOLO 危险徽章 + 分段 YOLO |
 | P-04 | Default 权限模式 | 设置 `permission_mode` default/ask/auto/always-approve。磁盘 default 现等于 ask。 | 设置页 | 否 |
-| P-05 | Shift+Tab 循环 | Prompt 焦点：Normal → Plan → Always-approve | 分段控件 | 是 |
+| P-05 | Shift+Tab 循环 | Prompt 焦点：Normal → Plan → Always-approve | 分段控件 | 是：普通 → Plan → YOLO |
 | P-06 | Plan mode | `/plan`、设置 `plan_mode`（pager 每会话，不写 toml）。Ask 模式只经 Shift+Tab 到 plan，设置里不暴露 Ask。 | `session/set_mode` | 是 |
 | P-07 | Plan 芯片 | `show_plan_chip`：退出 plan 后是否仍显示 | 顶栏 chip | 是 |
 | P-08 | `--allow` / `--deny` glob | CLI 规则。leader 不支持 per-client。 | Web 经 config.toml 或扩展；不要在浏览器造规则 DSL 除非有 UI | 否 |

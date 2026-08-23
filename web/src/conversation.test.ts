@@ -668,3 +668,62 @@ test("edit diff can come from rawInput old_string/new_string", () => {
   assert.match(t.items[0]?.html ?? "", /foo/);
   assert.match(t.items[0]?.html ?? "", /bar/);
 });
+
+test("tool args stream then pretty; elapsed and pending_user", () => {
+  const t = new ConversationTimeline();
+  t.opts.groupTools = false;
+  t.apply("session/update", {
+    update: {
+      sessionUpdate: "tool_call",
+      toolCallId: "p1",
+      kind: "other",
+      title: "custom",
+      status: "in_progress",
+      rawInput: { a: 1 },
+    },
+  });
+  assert.match(t.items[0]?.html ?? "", /"a":1/);
+  t.apply("session/update", {
+    update: {
+      sessionUpdate: "tool_call_delta_chunk",
+      toolCallId: "p1",
+      status: "in_progress",
+      delta: '{"b":2}',
+    },
+  });
+  t.apply("session/update", {
+    update: {
+      sessionUpdate: "tool_call_update",
+      toolCallId: "p1",
+      status: "completed",
+      elapsed_ms: 1500,
+    },
+  });
+  assert.match(t.items[0]?.html ?? "", /"a": 1/);
+  assert.equal(t.items[0]?.elapsedMs, 1500);
+  t.apply("session/update", {
+    update: {
+      sessionUpdate: "tool_call",
+      toolCallId: "p2",
+      kind: "other",
+      title: "need yes",
+      status: "pending_user",
+    },
+  });
+  assert.equal(t.items[1]?.status, "pending_user");
+});
+
+test("skill tool titles 使用了 skill", () => {
+  const t = new ConversationTimeline();
+  t.opts.groupTools = false;
+  t.apply("session/update", {
+    update: {
+      sessionUpdate: "tool_call",
+      toolCallId: "sk1",
+      name: "skill",
+      title: "my-skill",
+      status: "completed",
+    },
+  });
+  assert.match(t.items[0]?.title ?? "", /使用了 skill/);
+});

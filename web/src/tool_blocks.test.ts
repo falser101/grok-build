@@ -4,10 +4,14 @@ import {
   diffLines,
   formatToolHtml,
   parseSearchHits,
+  prettyToolArgs,
   renderDiff,
   splitHunks,
   toolFamily,
+  toolStatusLabel,
   toolSummary,
+  formatToolElapsed,
+  mergeArgStream,
   truncateLines,
   workflowSnapshot,
 } from "./tool_blocks.ts";
@@ -98,4 +102,24 @@ test("workflowSnapshot builds a phase trail", () => {
   assert.match(snap.html, /phase-trail/);
   assert.match(snap.html, /gather/);
   assert.match(snap.title, /review/);
+});
+
+test("unknown search kind and glob use search family", () => {
+  assert.equal(toolFamily("weird", "look up", "glob"), "search");
+  assert.equal(toolFamily("", "files", "grep_files"), "search");
+  assert.equal(toolFamily("other", "q", "x_search"), "search");
+  assert.equal(toolFamily("custom", "q", "foo", "search"), "search");
+});
+
+test("skill summary is 使用了 skill", () => {
+  assert.equal(toolSummary("skill", 1, "deploy"), "使用了 skill deploy");
+  const html = formatToolHtml("skill", "", { name: "deploy", title: "skill deploy" });
+  assert.match(html, /使用了 skill deploy/);
+});
+
+test("pending_user label and pretty args", () => {
+  assert.equal(toolStatusLabel("pending_user"), "等待你批准");
+  assert.equal(formatToolElapsed(1200), "1.2s");
+  assert.equal(prettyToolArgs('{"a":1}'), '{\n  "a": 1\n}');
+  assert.equal(mergeArgStream('{"a":1}', '{"b":2}'), '{"a":1,"b":2}');
 });

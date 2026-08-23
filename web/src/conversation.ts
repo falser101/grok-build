@@ -1,8 +1,13 @@
 import { stripImagePlaceholders, type Json } from "./protocol.ts";
 import {
   asToolFamily,
+  argChunkFromUpdate,
+  elapsedFromUpdate,
   formatToolHtml,
+  isBusyToolStatus,
+  isDoneToolStatus,
   isGroupableFamily,
+  mergeArgStream,
   membersHtml,
   mixedToolSummary,
   pathFromUpdate,
@@ -71,6 +76,8 @@ export type TimelineItem = {
   tokensBefore?: number;
   tokensAfter?: number;
   elapsedMs?: number;
+  startedAt?: number;
+  argText?: string;
 };
 
 export type ConversationEffect =
@@ -476,7 +483,7 @@ export class ConversationTimeline {
     const item = this.byId(id);
     if (!item || item.kind !== "tool") return;
     item.detailFull = true;
-    item.html = formatToolHtml(item.toolKind ?? "", item.raw, item.source ?? {}, { full: true });
+    item.html = formatToolHtml(item.toolKind ?? "", item.raw, item.source ?? {}, { full: true, args: item.argText, streaming: false });
     item.open = true;
     this.mark(item);
   }
@@ -648,18 +655,36 @@ export class ConversationTimeline {
     const existingId = this.toolIndex.get(toolCallId);
     const rawTitle =
       (typeof update.title === "string" && update.title.trim()) || "";
+    const metaBag = asRecord((update._meta as Json) ?? (rec?._meta as Json) ?? null);
+    const xaiTool = asRecord((metaBag?.["x.ai/tool"] as Json) ?? (metaBag?.tool as Json) ?? null);
+    const metaName = typeof xaiTool?.name === "string" ? xaiTool.name : "";
+    const metaKind = typeof xaiTool?.kind === "string" ? xaiTool.kind : "";
+    const toolName =
+      (typeof update.name === "string" && update.name) ||
+      metaName ||
+      "";
     const toolKind =
       (typeof update.kind === "string" && update.kind) ||
-      (typeof update.name === "string" && update.name) ||
+      metaKind ||
+      toolName ||
       "";
     const status = typeof update.status === "string" ? update.status : "";
     const body = toolBody(update);
-    const family = toolFamily(toolKind, rawTitle, typeof update.name === "string" ? update.name : "");
+    const family = toolFamily(toolKind, rawTitle, toolName, metaKind);
+    const argChunk = argChunkFromUpdate(update);
+    const now = Date.now();
+    const elapsedHint = elapsedFromUpdate(update);
     if (existingId) {
       const item = this.byId(existingId);
       if (item) {
         item.status = status || item.status;
         item.toolKind = toolKind || item.toolKind;
+        if (!item.startedAt) item.startedAt = now;
+        item.argText = mergeArgStream(item.argText ?? "", argChunk);
+        if (elapsedHint != null) item.elapsedMs = elapsedHint;
+        else if (isDoneToolStatus(item.status ?? "") && item.startedAt) {
+          item.elapsedMs = now - item.startedAt;
+        }
         if (!item.grouped) {
           if (body) {
             item.text = body;
@@ -669,6 +694,8 @@ export class ConversationTimeline {
           item.path = pathFromUpdate(update) ?? item.path;
           item.html = formatToolHtml(item.toolKind ?? toolKind, item.text, update, {
             full: item.detailFull,
+            args: item.argText,
+            streaming: isBusyToolStatus(item.status ?? ""),
           });
           if (rawTitle) {
             const nextFamily =
@@ -697,7 +724,10 @@ export class ConversationTimeline {
       kind: "tool",
       who: "tool",
       text: body || displayTitle,
-      html: formatToolHtml(toolKind, body || displayTitle, update),
+      html: formatToolHtml(toolKind, body || displayTitle, update, {
+        args: argChunk,
+        streaming: isBusyToolStatus(status),
+      }),
       eventId,
       replay,
       toolCallId,
@@ -705,7 +735,10 @@ export class ConversationTimeline {
       status,
       title: toolSummary(family, 1, displayTitle),
       members: [{ family, title: displayTitle }],
-      timestamp: Date.now(),
+      timestamp: now,
+      startedAt: now,
+      argText: argChunk,
+      elapsedMs: elapsedHint ?? undefined,
       raw: body || displayTitle,
       open: family === "edit",
       hook: hookFrom(update, rec),

@@ -1,7 +1,10 @@
+export type SlashKind = "pager" | "shell" | "skill";
+
 export type SlashCommand = {
   name: string;
   description: string | null;
   argumentHint: string | null;
+  kind?: SlashKind;
 };
 
 export type LocalSlash = { name: string; args: string };
@@ -259,6 +262,25 @@ export const LOCAL_SLASH: SlashCommand[] = [
   { name: "imagine", description: "这一档不做", argumentHint: null },
 ];
 
+export function slashKind(name: string, source: "local" | "available" = "local"): SlashKind {
+  if (name.includes(":")) return "skill";
+  const canonical = canonicalSlashName(name);
+  if (canonical.includes(":")) return "skill";
+  if (source === "available") return "shell";
+  if (LOCAL_ACTIONS.has(canonical) || LATER.has(canonical)) return "pager";
+  return "shell";
+}
+
+export function slashBadgeLabel(kind: SlashKind): "P" | "S" | "skill" {
+  if (kind === "pager") return "P";
+  if (kind === "shell") return "S";
+  return "skill";
+}
+
+export function annotateSlash(cmd: SlashCommand, source: "local" | "available"): SlashCommand {
+  return { ...cmd, kind: cmd.kind ?? slashKind(cmd.name, source) };
+}
+
 export function mergeSlashMenu(
   local: SlashCommand[],
   available: SlashCommand[],
@@ -269,13 +291,13 @@ export function mergeSlashMenu(
     const key = cmd.name.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(cmd);
+    out.push(annotateSlash(cmd, "local"));
   }
   for (const cmd of available) {
     const key = cmd.name.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(cmd);
+    out.push(annotateSlash(cmd, "available"));
   }
   return out;
 }
@@ -320,13 +342,30 @@ export function loadCompactMode(store: Pick<Storage, "getItem">): boolean {
   return store.getItem(COMPACT_MODE_KEY) === "1";
 }
 
+export const HELP_FOOTER = "注：本目录，不是外站。";
+
+/** Built-in commands grok-web actually wires (skip later/forbidden stubs). */
+export function wiredHelpCommands(commands: SlashCommand[] = LOCAL_SLASH): SlashCommand[] {
+  const seen = new Set<string>();
+  const out: SlashCommand[] = [];
+  for (const cmd of commands) {
+    const canon = canonicalSlashName(cmd.name);
+    if (seen.has(canon)) continue;
+    if (cmd.description === LATER_TOAST) continue;
+    if (LATER.has(canon) || FORBIDDEN.has(canon)) continue;
+    seen.add(canon);
+    out.push(annotateSlash(cmd, cmd.name.includes(":") ? "available" : "local"));
+  }
+  return out;
+}
+
 export function helpLines(commands: SlashCommand[] = LOCAL_SLASH): string {
   const lines = ["Slash 命令（本页拦截优先，其余发给 Agent）", ""];
-  for (const cmd of commands) {
-    if (cmd.description === LATER_TOAST) continue;
+  for (const cmd of wiredHelpCommands(commands)) {
     const hint = cmd.argumentHint ? ` ${cmd.argumentHint}` : "";
-    lines.push(`/${cmd.name}${hint}  —  ${cmd.description ?? ""}`);
+    const badge = slashBadgeLabel(cmd.kind ?? slashKind(cmd.name));
+    lines.push(`/${cmd.name}${hint}  [${badge}]  —  ${cmd.description ?? ""}`);
   }
-  lines.push("", "技能命令来自 availableCommands，不会写死。");
+  lines.push("", HELP_FOOTER);
   return lines.join("\n");
 }

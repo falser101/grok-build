@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  HELP_FOOTER,
   LATER_TOAST,
   LOCAL_SLASH,
   applyCompactMode,
@@ -12,7 +13,10 @@ import {
   parseLocalSlash,
   parseThemeArg,
   planSlash,
+  slashBadgeLabel,
+  slashKind,
   slashRunsOnAccept,
+  wiredHelpCommands,
 } from "./slash.ts";
 
 test("parseLocalSlash intercepts pager locals and aliases", () => {
@@ -100,5 +104,47 @@ test("canonical aliases and help listing", () => {
   const help = helpLines();
   assert.match(help, /\/exit/);
   assert.match(help, /\/help/);
+  assert.doesNotMatch(help, /gboom/);
+});
+
+test("slashKind badges: local pager, available shell, scoped skill", () => {
+  assert.equal(slashKind("help", "local"), "pager");
+  assert.equal(slashKind("theme", "local"), "pager");
+  assert.equal(slashKind("hooks", "local"), "pager");
+  assert.equal(slashKind("compact", "local"), "shell");
+  assert.equal(slashKind("flush", "available"), "shell");
+  assert.equal(slashKind("user:review", "available"), "skill");
+  assert.equal(slashKind("plugin:foo", "local"), "skill");
+  assert.equal(slashBadgeLabel("pager"), "P");
+  assert.equal(slashBadgeLabel("shell"), "S");
+  assert.equal(slashBadgeLabel("skill"), "skill");
+});
+
+test("mergeSlashMenu stamps P/S/skill and keeps scoped skill names", () => {
+  const merged = mergeSlashMenu(LOCAL_SLASH, [
+    { name: "copy", description: "agent copy", argumentHint: null },
+    { name: "user:review", description: "skill", argumentHint: null },
+    { name: "flush", description: "write memory", argumentHint: null },
+  ]);
+  assert.equal(merged.find((c) => c.name === "help")?.kind, "pager");
+  assert.equal(merged.find((c) => c.name === "copy")?.kind, "pager");
+  assert.equal(merged.find((c) => c.name === "compact")?.kind, "shell");
+  assert.equal(merged.find((c) => c.name === "flush")?.kind, "shell");
+  const skill = merged.find((c) => c.name === "user:review");
+  assert.equal(skill?.kind, "skill");
+  assert.equal(skill?.name, "user:review");
+});
+
+test("wired help lists built-ins we ship, not an external site", () => {
+  const wired = wiredHelpCommands();
+  assert.ok(wired.some((c) => c.name === "help"));
+  assert.ok(wired.some((c) => c.name === "model"));
+  assert.ok(wired.some((c) => c.name === "theme"));
+  assert.ok(!wired.some((c) => c.name === "hooks"));
+  assert.ok(!wired.some((c) => c.name === "gboom"));
+  const help = helpLines();
+  assert.match(help, /\/help  \[P\]/);
+  assert.match(help, new RegExp(HELP_FOOTER));
+  assert.match(help, /不是外站/);
   assert.doesNotMatch(help, /gboom/);
 });

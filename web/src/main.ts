@@ -91,14 +91,16 @@ import { applyTheme, loadThemePref, persistThemePref } from "./theme";
 import {
   LATER_TOAST,
   applyCompactMode,
-  helpLines,
   loadCompactMode,
   mergeSlashMenu,
-  nextThemePref,
   parseEffortArg,
   parseThemeArg,
   planSlash,
+  slashBadgeLabel,
+  slashKind,
   slashRunsOnAccept,
+  wiredHelpCommands,
+  type SlashKind,
 } from "./slash";
 import { BlockHost } from "./blocking_view";
 import {
@@ -207,6 +209,9 @@ const queueStrip = $("queue-strip");
 const followUpsEl = $("follow-ups");
 const imageChipsEl = $("image-chips");
 const slashMenu = $("slash-menu");
+const slashPicker = $("slash-picker");
+const helpCard = $("slash-help-card");
+const helpList = $("slash-help-list");
 const promptHistoryEl = $("prompt-history");
 const btnStop = $<HTMLButtonElement>("btn-stop");
 const btnFollow = $<HTMLButtonElement>("btn-follow");
@@ -327,6 +332,12 @@ let imageChips: ImageChip[] = [];
 let localQueue: QueueItem[] = [];
 let slashItems: SlashCommand[] = [];
 let slashIndex = 0;
+type PickerMode = "model" | "theme";
+type PickerItem = { id: string; label: string; meta?: string; current?: boolean };
+let pickerMode: PickerMode | null = null;
+let pickerItems: PickerItem[] = [];
+let pickerIndex = 0;
+let themePreviewOrig: typeof themePref | null = null;
 let historyItems: string[] = [];
 let historyIndex = -1;
 let sentHistory: string[] = [];
@@ -621,6 +632,7 @@ function syncThread() {
     p.className = "empty";
     p.textContent = "从左侧打开会话，或点「新会话」。";
     thread.append(p);
+    attachHelpCard();
     btnFollow.hidden = true;
     threadRail.hidden = true;
     return;
@@ -655,6 +667,7 @@ function syncThread() {
   else if (!threadRail.hidden) markActiveRailTick();
   if (turnRunning || timeline.liveAgentId || timeline.liveThinkId) scheduleMermaid();
   else void enhanceMermaid(thread);
+  attachHelpCard();
   updateComposerDock();
 }
 
@@ -2036,7 +2049,7 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
     return true;
   }
   if (name === "help") {
-    openAction("帮助", helpLines());
+    openHelpCard();
     return true;
   }
   if (name === "docs") {
@@ -2158,7 +2171,7 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
       await setSessionModel(hit.id);
       return true;
     }
-    btnModelChip.click();
+    openModelPicker();
     return true;
   }
   if (name === "effort") {
@@ -2204,10 +2217,11 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
   }
   if (name === "theme") {
     const named = parseThemeArg(args);
-    themePref = named ?? nextThemePref(themePref);
-    themePrefEl.value = themePref;
-    persistThemePref(themePref, localStorage);
-    applyTheme(themePref);
+    if (named) {
+      applyThemeChoice(named, true);
+      return true;
+    }
+    openThemePicker();
     return true;
   }
   if (name === "rename") {
@@ -2925,6 +2939,7 @@ function hidePopovers() {
   promptHistoryEl.hidden = true;
   atMenu.hidden = true;
   closeComposerMenu();
+  syncComposerHint();
 }
 
 function setComposerMode(mode: "" | "shell" | "remember") {
@@ -3016,10 +3031,202 @@ async function ensureFuzzy(query: string) {
   }
 }
 
+function defaultComposerHint(): string {
+  return composerPrefs.enterSends
+    ? "Enter 发送 · Shift+Enter 换行"
+    : "Ctrl+Enter 发送 · Enter 换行";
+}
+
+function syncComposerHint() {
+  if (!slashMenu.hidden) {
+    hint.textContent = "Tab 选 · Enter 执行";
+    return;
+  }
+  if (!slashPicker.hidden && pickerMode === "model") {
+    hint.textContent = "Enter 应用模型";
+    return;
+  }
+  if (!slashPicker.hidden && pickerMode === "theme") {
+    hint.textContent = "点选即预览";
+    return;
+  }
+  hint.textContent = defaultComposerHint();
+}
+
+function slashPopoverOpen(): boolean {
+  return !slashMenu.hidden || !slashPicker.hidden;
+}
+
+function applyThemeChoice(pref: "auto" | "dark" | "light", persist: boolean) {
+  themePref = pref;
+  themePrefEl.value = pref;
+  applyTheme(pref);
+  if (persist) persistThemePref(pref, localStorage);
+}
+
+function closeSlashPicker(revertTheme: boolean) {
+  if (revertTheme && themePreviewOrig) {
+    applyThemeChoice(themePreviewOrig, false);
+  }
+  themePreviewOrig = null;
+  pickerMode = null;
+  pickerItems = [];
+  pickerIndex = 0;
+  slashPicker.hidden = true;
+  slashPicker.replaceChildren();
+}
+
+function renderPicker() {
+  slashPicker.replaceChildren();
+  const title = document.createElement("div");
+  title.className = "slash-picker-title";
+  title.textContent = pickerMode === "theme" ? "主题" : "模型";
+  slashPicker.append(title);
+  if (!pickerItems.length) {
+    const empty = document.createElement("div");
+    empty.className = "slash-hint";
+    empty.style.padding = "0.45rem 0.75rem";
+    empty.textContent = pickerMode === "model" ? "暂无模型快照" : "无主题";
+    slashPicker.append(empty);
+    slashPicker.hidden = false;
+    syncComposerHint();
+    return;
+  }
+  pickerItems.forEach((item, i) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "slash-row";
+    row.setAttribute("role", "option");
+    row.setAttribute("aria-selected", i === pickerIndex ? "true" : "false");
+    if (pickerMode === "theme") {
+      const swatch = document.createElement("span");
+      swatch.className = `theme-swatch theme-swatch-${item.id}`;
+      row.append(swatch);
+    }
+    const name = document.createElement("span");
+    name.className = "slash-name";
+    name.textContent = item.label;
+    const meta = document.createElement("span");
+    meta.className = "slash-hint";
+    meta.textContent = item.current ? `${item.meta ?? ""} 当前`.trim() : (item.meta ?? "");
+    row.append(name, meta);
+    row.addEventListener("click", () => acceptPicker(item));
+    slashPicker.append(row);
+  });
+  slashPicker.hidden = false;
+  syncComposerHint();
+}
+
+function openModelPicker() {
+  closeSlashPicker(false);
+  slashMenu.hidden = true;
+  pickerMode = "model";
+  const effort = effortChipLabel(currentEffort);
+  pickerItems = catalogModels.map((m) => ({
+    id: m.id,
+    label: m.name,
+    meta: effort,
+    current: m.id === currentModelId,
+  }));
+  pickerIndex = Math.max(0, pickerItems.findIndex((m) => m.current));
+  renderPicker();
+}
+
+function openThemePicker() {
+  closeSlashPicker(false);
+  slashMenu.hidden = true;
+  pickerMode = "theme";
+  themePreviewOrig = themePref;
+  pickerItems = [
+    { id: "light", label: "浅", current: themePref === "light" },
+    { id: "dark", label: "暗", current: themePref === "dark" },
+    { id: "auto", label: "系统", current: themePref === "auto" },
+  ];
+  pickerIndex = Math.max(0, pickerItems.findIndex((m) => m.current));
+  renderPicker();
+  const cur = pickerItems[pickerIndex];
+  if (cur && (cur.id === "auto" || cur.id === "dark" || cur.id === "light")) {
+    applyThemeChoice(cur.id, false);
+  }
+}
+
+function acceptPicker(item: PickerItem) {
+  if (pickerMode === "model") {
+    closeSlashPicker(false);
+    promptEl.value = "";
+    void setSessionModel(item.id);
+    syncComposerHint();
+    return;
+  }
+  if (pickerMode === "theme" && (item.id === "auto" || item.id === "dark" || item.id === "light")) {
+    applyThemeChoice(item.id, true);
+    themePreviewOrig = null;
+    closeSlashPicker(false);
+    promptEl.value = "";
+    syncComposerHint();
+  }
+}
+
+function previewPicker(index: number) {
+  pickerIndex = index;
+  renderPicker();
+  const item = pickerItems[pickerIndex];
+  if (pickerMode === "theme" && item && (item.id === "auto" || item.id === "dark" || item.id === "light")) {
+    applyThemeChoice(item.id, false);
+  }
+}
+
+function openHelpCard() {
+  helpList.replaceChildren();
+  const extras = (snapshot?.availableCommands ?? [])
+    .filter((c) => c.name.includes(":"))
+    .map((c) => ({
+      name: c.name,
+      description: c.description,
+      argumentHint: c.argumentHint,
+      kind: "skill" as SlashKind,
+    }));
+  const cmds = wiredHelpCommands(mergeSlashMenu(LOCAL_SLASH, extras));
+  for (const cmd of cmds) {
+    const li = document.createElement("li");
+    const name = document.createElement("span");
+    name.className = "slash-name";
+    name.textContent = `/${cmd.name}`;
+    const desc = document.createElement("span");
+    desc.className = "slash-hint";
+    desc.textContent = cmd.description ?? "";
+    const badge = document.createElement("span");
+    const kind = cmd.kind ?? slashKind(cmd.name);
+    badge.className = `slash-badge slash-badge-${kind}`;
+    badge.textContent = slashBadgeLabel(kind);
+    li.append(name, desc, badge);
+    helpList.append(li);
+  }
+  helpCard.hidden = false;
+  attachHelpCard();
+  helpCard.scrollIntoView({ block: "nearest" });
+}
+
+function attachHelpCard() {
+  if (helpCard.hidden) return;
+  if (helpCard.parentElement !== thread) thread.append(helpCard);
+}
+
+function closeHelpCard() {
+  helpCard.hidden = true;
+}
+
 function renderSlashMenu() {
   const q = slashQuery(promptEl.value, promptEl.selectionStart ?? promptEl.value.length);
+  if (q !== null && !slashPicker.hidden) closeSlashPicker(true);
+  if (!slashPicker.hidden) {
+    slashMenu.hidden = true;
+    syncComposerHint();
+    return;
+  }
   if (q === null) {
     slashMenu.hidden = true;
+    syncComposerHint();
     return;
   }
   const commands: SlashCommand[] = mergeSlashMenu(
@@ -3041,14 +3248,20 @@ function renderSlashMenu() {
     row.setAttribute("role", "option");
     row.setAttribute("aria-selected", i === slashIndex ? "true" : "false");
     const name = document.createElement("span");
+    name.className = "slash-name";
     name.textContent = `/${cmd.name}`;
-    const hintEl = document.createElement("span");
-    hintEl.className = "slash-hint";
-    hintEl.textContent = cmd.argumentHint ?? cmd.description ?? "";
-    row.append(name, hintEl);
+    const desc = document.createElement("span");
+    desc.className = "slash-hint";
+    desc.textContent = cmd.description ?? cmd.argumentHint ?? "";
+    const badge = document.createElement("span");
+    const kind = cmd.kind ?? slashKind(cmd.name);
+    badge.className = `slash-badge slash-badge-${kind}`;
+    badge.textContent = slashBadgeLabel(kind);
+    row.append(name, desc, badge);
     row.addEventListener("click", () => acceptSlash(cmd));
     slashMenu.append(row);
   });
+  syncComposerHint();
 }
 
 function acceptSlash(cmd: SlashCommand) {
@@ -3244,7 +3457,7 @@ promptEl.addEventListener("keydown", (ev) => {
     {
       enterSends: composerPrefs.enterSends,
       promptEmpty: promptEl.value === "",
-      slashOpen: !slashMenu.hidden,
+      slashOpen: slashPopoverOpen(),
       historyOpen: !promptHistoryEl.hidden,
       atOpen: !atMenu.hidden,
       ghost: ghostText,
@@ -3266,15 +3479,29 @@ promptEl.addEventListener("keydown", (ev) => {
     return;
   }
   if (action === "slash-next") {
-    slashIndex = Math.min(slashItems.length - 1, slashIndex + 1);
-    renderSlashMenu();
+    if (!slashPicker.hidden) {
+      previewPicker(Math.min(pickerItems.length - 1, pickerIndex + 1));
+    } else {
+      slashIndex = Math.min(slashItems.length - 1, slashIndex + 1);
+      renderSlashMenu();
+    }
   }
   if (action === "slash-prev") {
-    slashIndex = Math.max(0, slashIndex - 1);
-    renderSlashMenu();
+    if (!slashPicker.hidden) {
+      previewPicker(Math.max(0, pickerIndex - 1));
+    } else {
+      slashIndex = Math.max(0, slashIndex - 1);
+      renderSlashMenu();
+    }
   }
-  if (action === "slash-accept" && slashItems[slashIndex]) acceptSlash(slashItems[slashIndex]!);
-  if (action === "slash-close") hidePopovers();
+  if (action === "slash-accept") {
+    if (!slashPicker.hidden && pickerItems[pickerIndex]) acceptPicker(pickerItems[pickerIndex]!);
+    else if (slashItems[slashIndex]) acceptSlash(slashItems[slashIndex]!);
+  }
+  if (action === "slash-close") {
+    closeSlashPicker(true);
+    hidePopovers();
+  }
   if (action === "accept-ghost" && ghostText) {
     promptEl.value += ghostText;
     ghostText = "";
@@ -3464,12 +3691,18 @@ filePick.addEventListener("change", () => {
   syncComposerFilled();
 });
 document.addEventListener("click", (ev) => {
-  if (composerMenu.hidden) return;
   const t = ev.target as Node | null;
-  if (t && (composerMenu.contains(t) || btnPermissionChip.contains(t) || btnModelChip.contains(t) || btnEffortChip.contains(t))) {
-    return;
+  if (!composerMenu.hidden) {
+    if (t && (composerMenu.contains(t) || btnPermissionChip.contains(t) || btnModelChip.contains(t) || btnEffortChip.contains(t))) {
+      /* keep chip menu */
+    } else {
+      closeComposerMenu();
+    }
   }
-  closeComposerMenu();
+  if (!slashPicker.hidden && t && !slashPicker.contains(t) && t !== promptEl) {
+    closeSlashPicker(true);
+    syncComposerHint();
+  }
 });
 combineQueuedEl.addEventListener("change", () => {
   composerPrefs.combineQueued = combineQueuedEl.checked;
@@ -3511,6 +3744,7 @@ btnInterject.addEventListener("click", () => {
 });
 
 
+$("btn-help-close").addEventListener("click", () => closeHelpCard());
 $("btn-find-close").addEventListener("click", () => {
   findBar.hidden = true;
 });
@@ -3564,6 +3798,11 @@ document.addEventListener("keydown", (ev) => {
   }
   if (!jumpPanel.hidden) {
     jumpPanel.hidden = true;
+    ev.preventDefault();
+    return;
+  }
+  if (!helpCard.hidden) {
+    closeHelpCard();
     ev.preventDefault();
     return;
   }

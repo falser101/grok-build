@@ -9,12 +9,14 @@ Pager 会先拦截同名。Web 必须自己实现所有 **P**，**S** 发给 Age
 
 可见性：Minimal 隐藏 dashboard/find/jump/timeline/theme/tutorial/workflows；全屏隐藏 expand/edit-prompt。
 
+Web 菜单徽章：本地 pager = **P**（描边），`availableCommands` 内置 = **S**（浅蓝底），`user:`/`plugin:`/`local:` skill = **skill**（灰底，显示 `scope:name`）。输入 `/` 时在 composer 上方模糊补全；选中行左侧 accent 条。`/help` 是会话内卡片，不是外站。
+
 ## Pager 本地
 
 | ID | 命令 | 别名 | TUI | Web 怎么做 | Web 已实现 |
 |---|---|---|---|---|---|
 | /P-exit | `/exit` | `/quit` | 退出进程 | 关 WS / 关页；不要杀用户机器上的别的 grok | 是 |
-| /P-help | `/help` | | 帮助 | 打开本目录或内置帮助页 | 是 |
+| /P-help | `/help` | | 帮助 | 会话内帮助卡（本目录，不是外站）。`/docs` 才开 docs.x.ai | 是 |
 | /P-docs | `/docs` | `/howto` `/guides` | 指南 picker；`web` 开 docs.x.ai；标题跳转 | iframe 或外链 | 是 |
 | /P-home | `/home` | `/welcome` | 回 Welcome | 回会话列表 | 是 |
 | /P-delete | `/delete` | | 确认后删历史 | S-10 | 是 |
@@ -31,7 +33,7 @@ Pager 会先拦截同名。Web 必须自己实现所有 **P**，**S** 发给 Age
 | /P-context | `/context` | | 也是 S | 发给 Agent 或画 `/context` UI | 是 |
 | /P-minimal | `/minimal` | | 重 exec Minimal | **Web 不做**双渲染模式 | 否（不做） |
 | /P-fullscreen | `/fullscreen` | `/full` | 重 exec 全屏 | 不做 | 否（不做） |
-| /P-model | `/model` `/m` | | picker 或名字+effort | `session/setModel`；下拉 | 是 |
+| /P-model | `/model` `/m` | | picker 或名字+effort | `session/set_model`；composer 上模型下拉，行来自现有模型 API/快照，不写死名字 | 是 |
 | /P-effort | `/effort` | | low/medium/high/xhigh | 发给 Agent | 是 |
 | /P-always-approve | `/always-approve` | `/yolo` | toggle；已开再跑则关。与 `/auto` 互切 | S 命令 + 徽章 | 是 |
 | /P-auto | `/auto` | | classifier 模式；功能关则菜单藏 | 同 | 是 |
@@ -47,7 +49,7 @@ Pager 会先拦截同名。Web 必须自己实现所有 **P**，**S** 发给 Age
 | /P-rename | `/rename` | `/title` | S-08 | 同 | 是 |
 | /P-dashboard | `/dashboard` | `/agents-dashboard` `/sessions` | D-；Minimal 藏；`GROK_AGENT_DASHBOARD=0` 关 | 会话列表页（磁盘而非进程 roster） | 菜单可见/轻提示 |
 | /P-cd | `/cd` | | S-31 | 慎 | 是 |
-| /P-theme | `/theme` `/t` | | picker 实时预览；无参循环；Minimal 无 | CSS 主题切换 | 是 |
+| /P-theme | `/theme` `/t` | | picker 实时预览；无参循环；Minimal 无 | composer 上浅/暗/系统色块下拉，点选即预览现有 CSS | 是 |
 | /P-feedback | `/feedback` | | 也是 S；无参开面板 | B-16 | 是 |
 | /P-announcements | `/announcements` | | 公告 modal | 拉远程公告或静态 | 否 |
 | /P-remember | `/remember` | | 立即记一条（不经 summary） | 发给 Agent | 否 |

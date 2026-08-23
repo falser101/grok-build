@@ -220,6 +220,14 @@
 
           <div class="stage-chat">
             <main class="thread" id="thread" aria-live="polite"></main>
+            <aside id="slash-help-card" class="slash-help-card" hidden>
+              <header class="slash-help-head">
+                <h2>帮助</h2>
+                <button type="button" id="btn-help-close">关闭</button>
+              </header>
+              <ul id="slash-help-list"></ul>
+              <p class="slash-help-foot">注：本目录，不是外站。</p>
+            </aside>
             <button type="button" id="btn-follow" hidden>回到最新</button>
             <nav id="thread-rail" hidden>
               <div class="rail-nav">
@@ -296,6 +304,7 @@
               ></textarea>
               <div id="ghost" hidden></div>
               <div id="slash-menu" hidden role="listbox"></div>
+              <div id="slash-picker" hidden role="listbox"></div>
               <div id="prompt-history" hidden role="listbox"></div>
               <div id="at-menu" hidden role="listbox"></div>
             </div>

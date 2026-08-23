@@ -22,6 +22,8 @@ html[data-theme="dark"] {
   --follow-bg: #141414;
   --edit: #e0a36a;
   --link: #8cb4ff;
+  --accent: #8cb4ff;
+  --badge-s: #8cb4ff;
   --btn-primary-bg: #fff;
   --btn-primary-ink: #111;
   --btn-primary-hover: #e8e8e8;
@@ -66,6 +68,8 @@ html[data-theme="light"] {
   --follow-bg: #ffffff;
   --edit: #b56a1a;
   --link: #1a5fd4;
+  --accent: #1a5fd4;
+  --badge-s: #4d8bff;
   --btn-primary-bg: #161616;
   --btn-primary-ink: #fff;
   --btn-primary-hover: #2c2c2c;
@@ -2073,6 +2077,7 @@ code {
 }
 
 #slash-menu,
+#slash-picker,
 #prompt-history {
   position: absolute;
   left: 0;
@@ -2087,19 +2092,33 @@ code {
 }
 
 #slash-menu[hidden],
+#slash-picker[hidden],
 #prompt-history[hidden] {
   display: none;
+}
+
+.slash-picker-title {
+  padding: 0.45rem 0.75rem 0.25rem;
+  color: var(--muted);
+  font-size: 0.75rem;
 }
 
 .slash-row,
 .history-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 0.75rem;
   width: 100%;
   text-align: left;
   padding: 0.45rem 0.7rem;
   border-radius: 0;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 
 .slash-row[aria-selected="true"],
@@ -2109,7 +2128,126 @@ code {
   background: var(--bg-3);
 }
 
+.slash-row[aria-selected="true"] {
+  border-left-color: var(--accent);
+}
+
+.slash-name {
+  color: var(--accent);
+  font-family: var(--mono);
+  flex: 0 0 auto;
+}
+
 .slash-hint {
+  color: var(--muted);
+  font-size: 0.75rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slash-badge {
+  flex: 0 0 auto;
+  font-size: 0.65rem;
+  line-height: 1.2;
+  padding: 0.08rem 0.38rem;
+  border-radius: 999px;
+}
+
+.slash-badge-pager {
+  border: 1px solid var(--muted);
+  color: var(--muted);
+  background: transparent;
+}
+
+.slash-badge-shell {
+  border: 0;
+  background: color-mix(in srgb, var(--badge-s) 28%, transparent);
+  color: var(--badge-s);
+}
+
+.slash-badge-skill {
+  border: 0;
+  background: #6a6a6a;
+  color: #f0f0f0;
+}
+
+.slash-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.theme-swatch {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+
+.theme-swatch-light {
+  background: #f4f4f4;
+}
+
+.theme-swatch-dark {
+  background: #161616;
+}
+
+.theme-swatch-auto {
+  background: linear-gradient(90deg, #161616 50%, #f4f4f4 50%);
+}
+
+.slash-help-card {
+  margin: 0.75rem auto 1.25rem;
+  width: min(40rem, calc(100% - 2rem));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-2);
+  padding: 0.85rem 1rem 0.7rem;
+}
+
+.slash-help-card[hidden] {
+  display: none;
+}
+
+.slash-help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.slash-help-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+#slash-help-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 18rem;
+  overflow: auto;
+}
+
+#slash-help-list li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.55rem;
+  align-items: baseline;
+  padding: 0.28rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.84rem;
+}
+
+.slash-help-foot {
+  margin: 0.7rem 0 0;
   color: var(--muted);
   font-size: 0.75rem;
 }

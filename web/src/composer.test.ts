@@ -117,6 +117,17 @@ test("slash query and fuzzy filter", () => {
     ["compact", "copy"],
   );
   assert.equal(applySlashAccept("/c", hits[0]!), "/compact ");
+  const badged = filterSlashCommands(
+    [
+      { name: "help", description: "打开命令帮助", argumentHint: null, kind: "pager" },
+      { name: "user:review", description: "skill", argumentHint: null, kind: "skill" },
+      { name: "compact", description: "shrink", argumentHint: null, kind: "shell" },
+    ],
+    "rev",
+  );
+  assert.equal(badged.length, 1);
+  assert.equal(badged[0]?.name, "user:review");
+  assert.equal(badged[0]?.kind, "skill");
 });
 
 test("queue drain and combine stop at slash", () => {

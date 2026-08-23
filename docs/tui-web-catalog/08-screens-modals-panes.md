@@ -12,8 +12,8 @@
 | U-06 | Command palette | `Ctrl+P` / `?`：快捷键+slash+skills | 模态模糊搜 | 是 |
 | U-07 | Settings modal | F2 / `Ctrl+,` / `Cmd+,` | 见 14-settings | 入口 |
 | U-08 | Theme picker | `/theme` 实时预览，Esc 还原 | 设置里即时换 CSS | 否 |
-| U-09 | Model picker | `Ctrl+M`（非 prompt 焦点） | 顶栏下拉 | 是 |
-| U-10 | Session picker | U 见 S-06 | 全屏路由 `/sessions` | 是 |
+| U-09 | Model picker | `Ctrl+M`（非 prompt 焦点） | 顶栏下拉（接口列表） | 是 |
+| U-10 | Session picker | U 见 S-06 | 全屏路由 `#/sessions` 主区列表 | 是 |
 | U-11 | File search dropdown | I-11 | combobox | 否 |
 | U-12 | File line viewer | `@` 结果看行 | modal | 否 |
 | U-13 | Slash dropdown | I-09 | combobox | 是 |

@@ -203,6 +203,23 @@ export function turnStatusLabel(phase: TurnPhase): string {
   return "idle";
 }
 
+function asNum(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() && !Number.isNaN(Number(v))) return Number(v);
+  return null;
+}
+
+function firstNum(bags: Array<{ [k: string]: unknown } | null>, keys: string[]): number | null {
+  for (const bag of bags) {
+    if (!bag) continue;
+    for (const key of keys) {
+      const n = asNum(bag[key]);
+      if (n != null) return n;
+    }
+  }
+  return null;
+}
+
 export function parseContextUsage(payload: unknown): {
   percent: number | null;
   tokens: number | null;
@@ -223,27 +240,27 @@ export function parseContextUsage(payload: unknown): {
   const ctx =
     data?.context && typeof data.context === "object" && !Array.isArray(data.context)
       ? (data.context as { [k: string]: unknown })
-      : data;
-  const percentRaw = ctx?.usedPercent ?? ctx?.used_percent ?? ctx?.percent;
-  const tokensRaw = ctx?.tokens ?? ctx?.usedTokens ?? ctx?.used_tokens;
-  const percent = typeof percentRaw === "number" ? percentRaw : null;
-  const tokens = typeof tokensRaw === "number" ? tokensRaw : null;
+      : null;
+  const bags = [ctx, data, inner, rec];
+  let percent = firstNum(bags, ["usedPercent", "used_percent", "percent", "contextPercent", "context_percent"]);
+  const tokens = firstNum(bags, ["tokens", "usedTokens", "used_tokens", "tokensUsed", "tokens_used"]);
+  const limit = firstNum(bags, [
+    "limit",
+    "maxTokens",
+    "max_tokens",
+    "contextWindow",
+    "context_window",
+    "window",
+    "tokenLimit",
+    "token_limit",
+  ]);
+  if (percent == null && tokens != null && limit && limit > 0) percent = (tokens / limit) * 100;
   if (percent != null) return { percent, tokens, label: `${Math.round(percent)}%` };
-  if (tokens != null) {
-    const compact =
-      tokens >= 1_000_000
-        ? `${(tokens / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`
-        : tokens >= 1000
-          ? `${(tokens / 1000).toFixed(1)}k`
-          : String(Math.round(tokens));
-    return { percent, tokens, label: compact };
-  }
-  return { percent: null, tokens: null, label: "上下文" };
+  return { percent: null, tokens, label: "—%" };
 }
 
 export function contextChipText(usage: { percent: number | null; tokens: number | null; label: string }): string {
-  if (usage.percent != null || usage.tokens != null) return `上下文 ${usage.label}`;
-  return "上下文";
+  return `上下文 ${usage.label}`;
 }
 
 export function formatSlashSubmit(name: string, args: string): string {

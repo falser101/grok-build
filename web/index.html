@@ -121,13 +121,16 @@
             <button type="button" class="session" id="session-label" title="重命名">无 session</button>
           </div>
           <div class="header-status" id="header-status">
-            <button type="button" id="btn-header-model">模型</button>
-            <span id="header-yolo" hidden>YOLO</span>
-            <span id="header-plan" hidden></span>
+            <div class="header-model-wrap">
+              <button type="button" id="btn-header-model">模型</button>
+              <div id="header-model-menu" hidden role="listbox"></div>
+            </div>
+            <button type="button" id="header-yolo" data-on="0">YOLO</button>
+            <button type="button" id="header-plan" data-on="0">plan</button>
             <span id="turn-status" hidden>idle</span>
           </div>
           <div class="header-right">
-            <button type="button" id="header-context" hidden>上下文</button>
+            <button type="button" id="header-context">上下文 —%</button>
           <div class="header-actions">
             <button id="btn-home" type="button" disabled>回列表</button>
             <details id="session-tools">
@@ -227,6 +230,11 @@
               <button id="btn-worktree" type="button">新 worktree</button>
               <button id="btn-import-claude" type="button" hidden>导入 Claude</button>
             </div>
+          </section>
+
+          <section class="surface sessions" id="session-index" hidden>
+            <h2>会话</h2>
+            <div id="session-index-list"></div>
           </section>
 
           <div class="stage-chat">

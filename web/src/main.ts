@@ -301,10 +301,13 @@ const settingsModal = $("settings-modal");
 const btnSettings = $<HTMLButtonElement>("btn-settings");
 const btnSettingsClose = $<HTMLButtonElement>("btn-settings-close");
 const btnHeaderModel = $<HTMLButtonElement>("btn-header-model");
+const headerModelMenu = $("header-model-menu");
 const headerContext = $<HTMLButtonElement>("header-context");
-const headerYolo = $("header-yolo");
-const headerPlan = $("header-plan");
+const headerYolo = $<HTMLButtonElement>("header-yolo");
+const headerPlan = $<HTMLButtonElement>("header-plan");
 const turnStatusEl = $("turn-status");
+const sessionIndex = $("session-index");
+const sessionIndexList = $("session-index-list");
 const appDialog = $("app-dialog");
 const appDialogTitle = $("app-dialog-title");
 const appDialogBody = $("app-dialog-body");
@@ -521,15 +524,43 @@ function markPhase(phase: string) {
 }
 
 function showSurface(
-  name: "idle" | "connecting" | "doctor" | "login" | "welcome" | "session",
+  name: "idle" | "connecting" | "doctor" | "login" | "welcome" | "session" | "sessions",
 ) {
   connecting.hidden = name !== "connecting";
   doctor.hidden = name !== "doctor";
   loginEl.hidden = name !== "login";
   welcomeEl.hidden = name !== "welcome";
+  sessionIndex.hidden = name !== "sessions";
   markPhase(name);
   if (name === "session") uncoverChatIfOverlay();
   updateComposerDock();
+}
+
+function showSessionIndex() {
+  renderSessionIndex();
+  showSurface("sessions");
+  hint.textContent = "已回到列表。连接仍保持。";
+  applyComposerGate();
+  writeSessionHash();
+}
+
+function renderSessionIndex() {
+  sessionIndexList.replaceChildren();
+  if (!authenticated) {
+    const p = document.createElement("p");
+    p.className = "session-list-empty";
+    p.textContent = "登录后，这里会列出工作区会话。";
+    sessionIndexList.append(p);
+    return;
+  }
+  if (!recentSessions.length) {
+    const p = document.createElement("p");
+    p.className = "session-list-empty";
+    p.textContent = "还没有会话。点侧栏「新会话」。";
+    sessionIndexList.append(p);
+    return;
+  }
+  for (const entry of recentSessions) sessionIndexList.append(renderSessionRow(entry));
 }
 
 function updateComposerDock() {
@@ -898,10 +929,14 @@ function syncComposerChips() {
 
 function syncHeaderChips() {
   btnHeaderModel.textContent = currentModelName || "模型";
-  headerYolo.hidden = !yoloMode;
-  const plan = planBadge.textContent?.trim() ?? "";
-  headerPlan.hidden = planBadge.hidden || !plan;
-  headerPlan.textContent = plan;
+  headerYolo.hidden = false;
+  headerYolo.dataset.on = yoloMode ? "1" : "0";
+  headerYolo.textContent = "YOLO";
+  const planOn = !planNudge.hidden || Boolean(planBadge.textContent?.trim());
+  headerPlan.hidden = false;
+  headerPlan.dataset.on = planOn ? "1" : "0";
+  headerPlan.textContent = "plan";
+  if (!headerContext.textContent?.includes("%")) headerContext.textContent = "上下文 —%";
 }
 
 function applyContextUsage(raw: Json) {
@@ -927,7 +962,7 @@ function applyHashRoute() {
       applySidebarLayout();
     }
     if (sessionId) leaveSession();
-    else if (authenticated) renderWelcome();
+    else if (authenticated) showSessionIndex();
     return;
   }
   if (route.kind === "session" && route.id && route.id !== sessionId) {
@@ -1454,7 +1489,10 @@ async function afterAuthenticated(authMeta: Json | null, resume = false) {
         })
       : Promise.resolve();
   await Promise.all([refreshSessions(), loadTarget]);
-  if (route.kind === "sessions") writeSessionHash();
+  if (route.kind === "sessions") {
+    writeSessionHash();
+    showSessionIndex();
+  }
 }
 
 function applyTitleNotification(
@@ -1543,6 +1581,7 @@ async function refreshSessions(): Promise<void> {
     recentSessions = all.length ? all : [];
   }
   renderSessionList();
+  if (app.dataset.surface === "sessions") renderSessionIndex();
   persistSessionCache();
 }
 
@@ -1807,7 +1846,8 @@ async function handshake(resume: boolean): Promise<void> {
         setState("live", "已连接");
         return;
       }
-      renderWelcome();
+      if (parseHashRoute(location.hash).kind === "sessions") showSessionIndex();
+      else renderWelcome();
       setState("live", "已连接");
       return;
     } catch (e) {
@@ -2570,7 +2610,8 @@ async function startInteractiveLogin(): Promise<void> {
     const auth = await authInFlight;
     authInFlight = null;
     await afterAuthenticated(auth);
-    renderWelcome();
+    if (parseHashRoute(location.hash).kind === "sessions") showSessionIndex();
+    else if (!sessionId) renderWelcome();
     setState("live", "已连接");
   } catch (e) {
     authInFlight = null;
@@ -2586,7 +2627,8 @@ async function submitApiKey(): Promise<void> {
   apiKeyInput.value = "";
   const auth = await acpCall("authenticate", buildAuthenticateParams("xai.api_key"));
   await afterAuthenticated(auth);
-  renderWelcome();
+  if (parseHashRoute(location.hash).kind === "sessions") showSessionIndex();
+  else if (!sessionId) renderWelcome();
   setState("live", "已连接");
 }
 
@@ -2631,10 +2673,7 @@ function leaveSession() {
   titlePinned = false;
   clearSessionView();
   persistSessionCache(null);
-  renderWelcome();
-  hint.textContent = "已回到列表。连接仍保持。";
-  applyComposerGate();
-  writeSessionHash();
+  showSessionIndex();
 }
 
 function currentEntry(): SessionListEntry | null {
@@ -2770,9 +2809,7 @@ async function showInfo(entry: SessionListEntry) {
 }
 
 async function showContext(entry: SessionListEntry) {
-  const info = await acpCall("x.ai/session/info", buildSessionInfoParams(entry.sessionId));
-  applyContextUsage(info);
-  openAction("上下文", formatSessionInfo(info));
+  await refreshContextChip(entry.sessionId);
 }
 
 async function rewindSession(entry: SessionListEntry) {
@@ -3273,10 +3310,25 @@ sessionLabel.addEventListener("click", () => {
   const entry = currentEntry();
   if (entry) void renameSession(entry);
 });
-btnHeaderModel.addEventListener("click", () => openModelPicker());
+btnHeaderModel.addEventListener("click", (ev) => {
+  ev.stopPropagation();
+  void openHeaderModelMenu();
+});
+headerYolo.addEventListener("click", () => {
+  void runLocalSlash({ name: "always-approve", args: "" });
+});
+headerPlan.addEventListener("click", () => {
+  headerPlan.dataset.on = headerPlan.dataset.on === "1" ? "0" : "1";
+});
 headerContext.addEventListener("click", () => {
   const entry = currentEntry();
-  if (entry) void showContext(entry);
+  if (entry) void refreshContextChip(entry.sessionId);
+});
+document.addEventListener("click", (ev) => {
+  if (headerModelMenu.hidden) return;
+  const t = ev.target;
+  if (t instanceof Node && (headerModelMenu.contains(t) || btnHeaderModel.contains(t))) return;
+  headerModelMenu.hidden = true;
 });
 $("image-lightbox").addEventListener("click", (ev) => {
   if (ev.target === $("image-lightbox")) closeLightbox();
@@ -3587,18 +3639,57 @@ function renderPicker() {
 }
 
 function openModelPicker() {
-  closeSlashPicker(false);
-  slashMenu.hidden = true;
-  pickerMode = "model";
+  void openHeaderModelMenu();
+}
+
+async function refreshContextChip(id: string) {
+  try {
+    const info = await acpCall("x.ai/session/info", buildSessionInfoParams(id));
+    applyModelState(info);
+    applyContextUsage(info);
+  } catch {
+    headerContext.textContent = "上下文 —%";
+  }
+}
+
+async function openHeaderModelMenu() {
+  headerModelMenu.hidden = false;
+  if (!catalogModels.length && sessionId) {
+    try {
+      const info = await acpCall("x.ai/session/info", buildSessionInfoParams(sessionId));
+      applyModelState(info);
+      applyContextUsage(info);
+    } catch {
+      /* keep empty */
+    }
+  }
   const effort = effortChipLabel(currentEffort);
-  pickerItems = catalogModels.map((m) => ({
-    id: m.id,
-    label: m.name,
-    meta: effort,
-    current: m.id === currentModelId,
-  }));
-  pickerIndex = Math.max(0, pickerItems.findIndex((m) => m.current));
-  renderPicker();
+  headerModelMenu.replaceChildren();
+  if (!catalogModels.length) {
+    const empty = document.createElement("div");
+    empty.className = "header-model-item";
+    empty.textContent = "没有模型列表";
+    headerModelMenu.append(empty);
+    return;
+  }
+  for (const m of catalogModels) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "header-model-item";
+    row.setAttribute("role", "option");
+    row.setAttribute("aria-selected", m.id === currentModelId ? "true" : "false");
+    const name = document.createElement("span");
+    name.textContent = m.name;
+    const meta = document.createElement("span");
+    meta.className = "model-effort";
+    meta.textContent = m.id === currentModelId ? `${effort} 当前`.trim() : effort;
+    row.append(name, meta);
+    row.addEventListener("click", () => {
+      headerModelMenu.hidden = true;
+      void setSessionModel(m.id);
+    });
+    headerModelMenu.append(row);
+  }
 }
 
 function openThemePicker() {

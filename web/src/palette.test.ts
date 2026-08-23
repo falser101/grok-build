@@ -59,12 +59,13 @@ test("hint focus and turn status", () => {
 
 test("context usage and slash args", () => {
   assert.equal(parseContextUsage({ data: { context: { usedPercent: 42 } } }).label, "42%");
-  assert.equal(parseContextUsage({ context: { tokens: 1500 } }).label, "1.5k");
-  assert.equal(parseContextUsage({}).label, "上下文");
+  assert.equal(parseContextUsage({ context: { tokens: 1500, contextWindow: 3000 } }).label, "50%");
+  assert.equal(parseContextUsage({}).label, "—%");
   assert.equal(formatSlashSubmit("find", "foo"), "/find foo");
   assert.equal(formatSlashSubmit("jump", "  "), "/jump");
   assert.ok(APP_SHORTCUTS.some((s) => s.keys === "Ctrl+P"));
   assert.equal(contextChipText(parseContextUsage({ data: { context: { usedPercent: 42 } } })), "上下文 42%");
+  assert.equal(contextChipText(parseContextUsage({})), "上下文 —%");
   const grouped = groupPaletteItems(
     buildPaletteItems({
       slash: [{ name: "help", description: "帮助", argumentHint: null }],

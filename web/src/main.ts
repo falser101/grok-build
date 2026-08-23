@@ -89,6 +89,26 @@ import {
 } from "./composer";
 import { applyTheme, loadThemePref, persistThemePref } from "./theme";
 import {
+  HELP_SHORTCUTS,
+  buildPaletteItems,
+  closeDialog,
+  contextChipText,
+  filterPaletteItems,
+  formatSlashSubmit,
+  groupPaletteItems,
+  hashForSession,
+  hashForSessions,
+  hintForFocus,
+  inferTurnPhase,
+  isTypingTarget,
+  mapGlobalHotkey,
+  openDialog,
+  parseContextUsage,
+  parseHashRoute,
+  turnStatusLabel,
+  type PaletteItem,
+} from "./palette";
+import {
   LATER_TOAST,
   applyCompactMode,
   loadCompactMode,
@@ -280,6 +300,15 @@ const sessionPopover = $("session-popover");
 const settingsModal = $("settings-modal");
 const btnSettings = $<HTMLButtonElement>("btn-settings");
 const btnSettingsClose = $<HTMLButtonElement>("btn-settings-close");
+const btnHeaderModel = $<HTMLButtonElement>("btn-header-model");
+const headerContext = $<HTMLButtonElement>("header-context");
+const headerYolo = $("header-yolo");
+const headerPlan = $("header-plan");
+const turnStatusEl = $("turn-status");
+const appDialog = $("app-dialog");
+const appDialogTitle = $("app-dialog-title");
+const appDialogBody = $("app-dialog-body");
+const appDialogEsc = $("app-dialog-esc");
 
 const acp = new AcpClient();
 
@@ -324,6 +353,13 @@ applyTheme(themePref);
 let compactModeOn = loadCompactMode(localStorage);
 applyCompactMode(compactModeOn, document.documentElement, localStorage);
 let queuePinned = false;
+let queueSelectedId: string | null = null;
+let hashSyncing = false;
+let paletteItems: PaletteItem[] = [];
+let paletteIndex = 0;
+let paletteQuery = "";
+type AppDialogKind = "palette" | "shortcuts" | "args" | "later" | "block" | null;
+let appDialogKind: AppDialogKind = null;
 timeline.opts.showThinking = composerPrefs.showThinking;
 timeline.opts.groupTools = composerPrefs.groupTools;
 timeline.opts.showTimestamps = composerPrefs.showTimestamps;
@@ -565,7 +601,7 @@ const itemHandlers = {
     }
   },
   onView: (item: (typeof timeline.items)[number]) => {
-    openAction(item.title || item.who, item.raw || item.text);
+    openBlockPreview(item);
   },
   onSelect: (item: (typeof timeline.items)[number]) => {
     timeline.select(item.id);
@@ -741,6 +777,7 @@ function renderRail() {
 function showRailPreview(item: { id: string; text: string }, tick: HTMLElement) {
   railPreviewText.textContent = railPreview(item.text);
   railPreviewEl.hidden = false;
+  railPreviewEl.dataset.id = item.id;
   const railBox = threadRail.getBoundingClientRect();
   const tickBox = tick.getBoundingClientRect();
   railPreviewEl.style.bottom = "auto";
@@ -856,6 +893,55 @@ function syncComposerChips() {
   btnEffortChip.textContent = effortChipLabel(currentEffort);
   const supports = catalogModels.find((m) => m.id === currentModelId)?.supportsEffort ?? true;
   btnEffortChip.hidden = !supports && !currentEffort;
+  syncHeaderChips();
+}
+
+function syncHeaderChips() {
+  btnHeaderModel.textContent = currentModelName || "模型";
+  headerYolo.hidden = !yoloMode;
+  const plan = planBadge.textContent?.trim() ?? "";
+  headerPlan.hidden = planBadge.hidden || !plan;
+  headerPlan.textContent = plan;
+}
+
+function applyContextUsage(raw: Json) {
+  const usage = parseContextUsage(raw);
+  headerContext.hidden = false;
+  headerContext.textContent = contextChipText(usage);
+}
+
+function writeSessionHash() {
+  const next = sessionId ? hashForSession(sessionId) : hashForSessions();
+  if (location.hash === next) return;
+  hashSyncing = true;
+  history.replaceState(null, "", `${location.pathname}${location.search}${next}`);
+  hashSyncing = false;
+}
+
+function applyHashRoute() {
+  if (hashSyncing) return;
+  const route = parseHashRoute(location.hash);
+  if (route.kind === "sessions") {
+    if (app.dataset.sidebar !== "open") {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, "0");
+      applySidebarLayout();
+    }
+    if (sessionId) leaveSession();
+    else if (authenticated) renderWelcome();
+    return;
+  }
+  if (route.kind === "session" && route.id && route.id !== sessionId) {
+    const row = recentSessions.find((s) => s.sessionId === route.id);
+    if (row) {
+      void openListedSession(row);
+      return;
+    }
+    if (workspaceCwd()) {
+      void loadSession(route.id, { cwd: workspaceCwd(), reconnect: false }).catch(() => {
+        /* banner */
+      });
+    }
+  }
 }
 
 function applyModelState(params: Json) {
@@ -975,6 +1061,7 @@ const blockHost = new BlockHost(blockCard, blockPill, {
     cancelSubagentsPrefEl.value = pref;
   },
 });
+syncTurnStatus();
 
 function stopTurn(cancelSubagents: boolean) {
   if (!sessionId) return;
@@ -985,6 +1072,7 @@ function stopTurn(cancelSubagents: boolean) {
   }
   turnRunning = false;
   syncTurnButtons();
+  syncTurnStatus();
   lastStopAt = Date.now();
   hint.textContent = cancelSubagents ? "已停止，草稿保留" : "已停止这次，子 agent 还在跑";
 }
@@ -1083,6 +1171,26 @@ function claimTabLock() {
   tabLock?.postMessage({ type: "claimed", tabId: TAB_ID });
 }
 
+function liveToolRunning(): boolean {
+  return timeline.items.some((item) => {
+    if (item.kind !== "tool" && item.kind !== "subagent" && item.kind !== "workflow") return false;
+    const st = (item.status ?? "").toLowerCase().replace(/-/g, "_");
+    return st === "pending" || st === "in_progress" || st === "running" || st === "inprogress";
+  });
+}
+
+function syncTurnStatus() {
+  const phase = inferTurnPhase({
+    connected: acp.connected && authenticated,
+    turnRunning,
+    liveTool: liveToolRunning(),
+    blocked: blockHost.busy,
+  });
+  turnStatusEl.textContent = turnStatusLabel(phase);
+  turnStatusEl.dataset.phase = phase;
+  turnStatusEl.hidden = phase === "idle";
+}
+
 function handleAgentEvent(method: string, params: Json) {
   if (method === "x.ai/yolo_mode_changed" || method === "x.ai/settings/update") {
     const rec = asRecord(params);
@@ -1159,6 +1267,7 @@ function handleAgentEvent(method: string, params: Json) {
     }
   }
   if (redraw) requestPaint();
+  syncTurnStatus();
 }
 
 function applyQueueChanged(params: Json) {
@@ -1169,22 +1278,60 @@ function applyQueueChanged(params: Json) {
 }
 
 function renderQueue() {
-  queueStrip.hidden = localQueue.length === 0 && !queuePinned;
+  const open = localQueue.length > 0 || queuePinned;
+  queueStrip.hidden = !open;
+  app.dataset.queue = open ? "1" : "0";
   queueStrip.replaceChildren();
-  if (localQueue.length === 0 && queuePinned) {
-    const empty = document.createElement("span");
-    empty.className = "queue-item";
+  const head = document.createElement("div");
+  head.className = "queue-pane-head";
+  const title = document.createElement("span");
+  title.textContent = "队列";
+  const clear = document.createElement("button");
+  clear.type = "button";
+  clear.textContent = "清空";
+  clear.title = "清空";
+  clear.addEventListener("click", () => {
+    localQueue = [];
+    queueSelectedId = null;
+    queuePinned = false;
+    renderQueue();
+  });
+  head.append(title, clear);
+  queueStrip.append(head);
+  if (localQueue.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "queue-empty";
     empty.textContent = "队列为空";
     queueStrip.append(empty);
     return;
   }
+  if (!queueSelectedId || !localQueue.some((q) => q.id === queueSelectedId)) {
+    queueSelectedId = localQueue[0]?.id ?? null;
+  }
   for (const item of localQueue) {
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = "queue-item";
-    row.textContent = item.text.slice(0, 80) || "(queued)";
-    row.addEventListener("click", () => {
+    const row = document.createElement("div");
+    row.className = "queue-card";
+    row.setAttribute("aria-selected", item.id === queueSelectedId ? "true" : "false");
+    const name = document.createElement("div");
+    name.className = "queue-card-title";
+    name.textContent = item.text.slice(0, 80) || "(queued)";
+    const st = document.createElement("div");
+    st.className = "queue-card-status";
+    st.textContent = "等待中";
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "queue-card-more";
+    more.textContent = "⋯";
+    more.title = "移除";
+    more.addEventListener("click", (ev) => {
+      ev.stopPropagation();
       localQueue = localQueue.filter((q) => q.id !== item.id);
+      if (queueSelectedId === item.id) queueSelectedId = null;
+      renderQueue();
+    });
+    row.append(name, st, more);
+    row.addEventListener("click", () => {
+      queueSelectedId = item.id;
       renderQueue();
     });
     queueStrip.append(row);
@@ -1286,11 +1433,17 @@ async function afterAuthenticated(authMeta: Json | null, resume = false) {
     await refreshSessions();
     return;
   }
+  const route = parseHashRoute(location.hash);
   const deep = deepLinkSessionId(location.search);
   const cachedLast = readSessionCache(localStorage)?.lastId ?? null;
-  const target = deep || pendingResumeId || cachedLast;
+  const target =
+    route.kind === "sessions"
+      ? null
+      : route.kind === "session"
+        ? route.id
+        : deep || pendingResumeId || cachedLast;
   pendingResumeId = null;
-  const listed = recentSessions.find((s) => s.sessionId === target);
+  const listed = target ? recentSessions.find((s) => s.sessionId === target) : undefined;
   const loadTarget =
     target && (listed || workspaceCwd())
       ? loadSession(target, {
@@ -1301,6 +1454,7 @@ async function afterAuthenticated(authMeta: Json | null, resume = false) {
         })
       : Promise.resolve();
   await Promise.all([refreshSessions(), loadTarget]);
+  if (route.kind === "sessions") writeSessionHash();
 }
 
 function applyTitleNotification(
@@ -1609,6 +1763,7 @@ function applyAuthMeta(raw: Json | null) {
     planBadge.hidden = false;
     planBadge.textContent = paywall.subscriptionTier;
   }
+  syncHeaderChips();
   const consent = parseConsent(raw);
   const showConsent = !consentAlreadyAcked(localStorage, consent.email);
   consentBanner.hidden = !showConsent;
@@ -1797,6 +1952,7 @@ async function refreshComposerModel(id: string) {
   try {
     const info = await acpCall("x.ai/session/info", buildSessionInfoParams(id));
     applyModelState(info);
+    applyContextUsage(info);
   } catch {
     /* optional */
   }
@@ -1829,9 +1985,10 @@ function setSession(id: string) {
   const summary = row?.summary.trim();
   sessionLabel.textContent = summary && summary !== id ? summary : id;
   setState("live", "已连接");
-  hint.textContent = "Enter 发送 · Shift+Enter 换行";
+  hint.textContent = hintForFocus("composer", composerPrefs.enterSends);
   applyComposerGate();
   persistSessionCache(id);
+  writeSessionHash();
 }
 
 function setConnectedUi(on: boolean) {
@@ -1925,6 +2082,11 @@ function scheduleReconnect(): void {
       applyComposerGate();
     } catch (e) {
       showBanner(e instanceof Error ? e.message : String(e));
+      if (reconnectAttempt >= 4) {
+        wantOpen = false;
+        showDoctor(e);
+        return;
+      }
       scheduleReconnect();
     }
   }, delay);
@@ -2348,6 +2510,7 @@ async function sendPrompt(
   hint.textContent = "生成中";
   turnRunning = true;
   syncTurnButtons();
+  syncTurnStatus();
   followUpsEl.hidden = true;
   try {
     await acp.request(
@@ -2368,6 +2531,7 @@ async function sendPrompt(
   } finally {
     turnRunning = false;
     syncTurnButtons();
+    syncTurnStatus();
   }
   setState("live", "已连接");
   hint.textContent = composerPrefs.enterSends
@@ -2470,6 +2634,7 @@ function leaveSession() {
   renderWelcome();
   hint.textContent = "已回到列表。连接仍保持。";
   applyComposerGate();
+  writeSessionHash();
 }
 
 function currentEntry(): SessionListEntry | null {
@@ -2494,7 +2659,7 @@ function openAction(title: string, body: string, listHtml?: HTMLElement[]) {
   actionTitle.textContent = title;
   actionBody.textContent = body;
   actionList.replaceChildren(...(listHtml ?? []));
-  actionModal.hidden = false;
+  openDialog(actionModal);
 }
 
 async function openToolPath(path: string) {
@@ -2519,7 +2684,7 @@ async function openToolPath(path: string) {
 }
 
 function closeAction() {
-  actionModal.hidden = true;
+  closeDialog(actionModal);
 }
 
 function threadText(): string {
@@ -2606,6 +2771,7 @@ async function showInfo(entry: SessionListEntry) {
 
 async function showContext(entry: SessionListEntry) {
   const info = await acpCall("x.ai/session/info", buildSessionInfoParams(entry.sessionId));
+  applyContextUsage(info);
   openAction("上下文", formatSessionInfo(info));
 }
 
@@ -2826,15 +2992,292 @@ btnSwitch.addEventListener("click", () => {
   logout({ acp: false }).catch((e) => showBanner(e instanceof Error ? e.message : String(e)));
 });
 function openSettings() {
-  settingsModal.hidden = false;
+  openDialog(settingsModal);
 }
 
 function closeSettings() {
-  settingsModal.hidden = true;
+  closeDialog(settingsModal);
+}
+
+function closeAppDialog() {
+  appDialogKind = null;
+  appDialog.removeAttribute("data-kind");
+  appDialogEsc.hidden = true;
+  closeDialog(appDialog);
+  appDialogBody.replaceChildren();
+}
+
+function showAppDialog(title: string, kind: AppDialogKind) {
+  appDialogTitle.textContent = title;
+  appDialogKind = kind;
+  if (kind) appDialog.dataset.kind = kind;
+  else appDialog.removeAttribute("data-kind");
+  appDialogEsc.hidden = kind !== "block";
+  openDialog(appDialog);
+}
+
+function showLaterStub(name: string) {
+  appDialogBody.replaceChildren();
+  const p = document.createElement("p");
+  p.className = "muted";
+  p.textContent = LATER_TOAST;
+  const extra = document.createElement("p");
+  extra.className = "muted";
+  extra.textContent = name;
+  appDialogBody.append(p, extra);
+  showAppDialog(name, "later");
+}
+
+function paletteSlashList() {
+  return mergeSlashMenu(
+    LOCAL_SLASH,
+    (snapshot?.availableCommands ?? []).map((c) => ({
+      name: c.name,
+      description: c.description,
+      argumentHint: c.argumentHint,
+    })),
+  );
+}
+
+function paletteIcon(kind: PaletteItem["kind"]): string {
+  if (kind === "shortcut") return "⌘";
+  if (kind === "skill") return "▣";
+  return "/";
+}
+
+function paintPaletteRows(list: HTMLElement) {
+  const menu = paletteSlashList();
+  const slash = menu.filter((c) => (c.kind ?? slashKind(c.name)) !== "skill");
+  const skills = menu.filter((c) => (c.kind ?? slashKind(c.name)) === "skill");
+  const extras: PaletteItem[] = [
+    { id: "entry:image", kind: "shortcut", title: "图片预览", hint: "入口", run: "lightbox" },
+    { id: "entry:video", kind: "shortcut", title: "视频预览", hint: "入口", run: "lightbox" },
+  ];
+  paletteItems = filterPaletteItems(
+    [...buildPaletteItems({ slash, skills }), ...extras],
+    paletteQuery,
+  );
+  paletteIndex = Math.min(Math.max(0, paletteIndex), Math.max(0, paletteItems.length - 1));
+  list.replaceChildren();
+  let offset = 0;
+  for (const group of groupPaletteItems(paletteItems.slice(0, 48))) {
+    const lab = document.createElement("div");
+    lab.className = "palette-group-label";
+    lab.textContent = group.label;
+    list.append(lab);
+    for (const item of group.items) {
+      const i = offset;
+      offset += 1;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "palette-row";
+      b.setAttribute("aria-selected", i === paletteIndex ? "true" : "false");
+      const ico = document.createElement("span");
+      ico.className = "palette-ico";
+      ico.textContent = paletteIcon(item.kind);
+      const title = document.createElement("span");
+      title.textContent = item.title;
+      const hintEl = document.createElement("span");
+      hintEl.className = "slash-hint";
+      hintEl.textContent = item.hint;
+      const cmd = menu.find((c) => c.name === item.run);
+      const kind = item.kind === "shortcut" ? null : (cmd?.kind ?? slashKind(item.run, item.kind === "skill" ? "available" : "local"));
+      if (kind) {
+        const badge = document.createElement("span");
+        badge.className = `slash-badge slash-badge-${kind}`;
+        badge.textContent = slashBadgeLabel(kind);
+        b.append(ico, title, hintEl, badge);
+      } else {
+        b.append(ico, title, hintEl);
+      }
+      b.addEventListener("click", () => {
+        void acceptPalette(item);
+      });
+      list.append(b);
+    }
+  }
+}
+
+function openPalette() {
+  paletteQuery = "";
+  paletteIndex = 0;
+  appDialogBody.replaceChildren();
+  const wrap = document.createElement("label");
+  wrap.className = "palette-search-wrap";
+  wrap.innerHTML =
+    '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="6.5" cy="6.5" r="4.2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M9.8 9.8 13.2 13.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+  const input = document.createElement("input");
+  input.className = "palette-search";
+  input.placeholder = "搜索快捷键、slash、skills";
+  wrap.append(input);
+  const list = document.createElement("div");
+  list.id = "palette-list";
+  const foot = document.createElement("p");
+  foot.className = "palette-foot";
+  foot.textContent = "Ctrl+P 打开 · Esc 关";
+  input.addEventListener("input", () => {
+    paletteQuery = input.value;
+    paletteIndex = 0;
+    paintPaletteRows(list);
+  });
+  input.addEventListener("keydown", (ev) => {
+    if (ev.key === "ArrowDown") {
+      ev.preventDefault();
+      paletteIndex = Math.min(paletteItems.length - 1, paletteIndex + 1);
+      paintPaletteRows(list);
+    }
+    if (ev.key === "ArrowUp") {
+      ev.preventDefault();
+      paletteIndex = Math.max(0, paletteIndex - 1);
+      paintPaletteRows(list);
+    }
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      const item = paletteItems[paletteIndex];
+      if (item) void acceptPalette(item);
+    }
+  });
+  appDialogBody.append(wrap, list, foot);
+  showAppDialog("命令", "palette");
+  paintPaletteRows(list);
+  input.focus();
+}
+
+function openShortcutsHelp() {
+  appDialogBody.replaceChildren();
+  const grid = document.createElement("div");
+  grid.className = "shortcut-grid";
+  for (const row of HELP_SHORTCUTS) {
+    const line = document.createElement("div");
+    line.className = "shortcut-row";
+    const keys = document.createElement("kbd");
+    keys.textContent = row.keys;
+    const title = document.createElement("span");
+    title.textContent = row.title;
+    line.append(keys, title);
+    grid.append(line);
+  }
+  appDialogBody.append(grid);
+  showAppDialog("快捷键", "shortcuts");
+}
+
+function openBlockPreview(item: (typeof timeline.items)[number]) {
+  appDialogBody.replaceChildren();
+  const status = document.createElement("div");
+  status.className = "block-status";
+  const label = item.title || item.who || item.kind;
+  const st = item.status || (item.kind === "tool" ? "done" : item.kind);
+  const done = /complete|done|ok|success|completed/i.test(st) || item.kind !== "tool";
+  const elapsed = item.elapsedMs != null ? `${(item.elapsedMs / 1000).toFixed(1)}s` : "";
+  status.textContent = done ? `${item.kind === "tool" ? `function ${label}` : label} 已完成` : `${label} ${st}`;
+  if (elapsed) {
+    const time = document.createElement("span");
+    time.style.marginLeft = "auto";
+    time.textContent = elapsed;
+    status.append(time);
+  }
+  const code = document.createElement("div");
+  code.className = "block-code";
+  const body = item.raw || item.text || "";
+  const lines = body.split("\n");
+  const gutter = document.createElement("div");
+  gutter.className = "block-gutter";
+  gutter.textContent = lines.map((_, i) => String(i + 1)).join("\n");
+  const pre = document.createElement("pre");
+  pre.className = "block-code-body";
+  pre.textContent = body;
+  code.append(gutter, pre);
+  const actions = document.createElement("div");
+  actions.className = "block-actions";
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.textContent = "复制内容";
+  copy.addEventListener("click", () => {
+    void navigator.clipboard.writeText(body).catch(() => downloadText("block.txt", body));
+  });
+  actions.append(copy);
+  appDialogBody.append(status, code, actions);
+  showAppDialog(`块预览 · ${label}`, "block");
+}
+
+function openArgStep(name: string, hintText: string) {
+  appDialogBody.replaceChildren();
+  const label = document.createElement("label");
+  label.textContent = hintText;
+  const input = document.createElement("input");
+  input.className = "arg-input";
+  input.placeholder = hintText;
+  const go = document.createElement("button");
+  go.type = "button";
+  go.textContent = "执行";
+  const run = () => {
+    const text = formatSlashSubmit(name, input.value);
+    closeAppDialog();
+    void submitComposer({ text }).catch((e) =>
+      showBanner(e instanceof Error ? e.message : String(e)),
+    );
+  };
+  go.addEventListener("click", run);
+  input.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      run();
+    }
+  });
+  appDialogBody.append(label, input, go);
+  showAppDialog(`/${name}`, "args");
+  input.focus();
+}
+
+async function acceptPalette(item: PaletteItem) {
+  if (item.run === "lightbox") {
+    closeAppDialog();
+    showLaterStub("音视频");
+    return;
+  }
+  if (item.kind === "shortcut") {
+    closeAppDialog();
+    if (item.run === "palette") openPalette();
+    else if (item.run === "shortcuts") openShortcutsHelp();
+    else if (item.run === "settings") openSettings();
+    else if (item.run === "model") openModelPicker();
+    return;
+  }
+  const cmd =
+    paletteSlashList().find((c) => c.name === item.run) ?? {
+      name: item.run,
+      description: item.hint,
+      argumentHint: item.argumentHint ?? null,
+    };
+  const plan = planSlash(`/${cmd.name}`);
+  if (plan.kind === "later") {
+    closeAppDialog();
+    showLaterStub(cmd.name);
+    return;
+  }
+  if (cmd.argumentHint) {
+    openArgStep(cmd.name, cmd.argumentHint);
+    return;
+  }
+  closeAppDialog();
+  await submitComposer({ text: `/${cmd.name}` });
 }
 
 btnSettings.addEventListener("click", () => openSettings());
 btnSettingsClose.addEventListener("click", () => closeSettings());
+$("btn-app-dialog-close").addEventListener("click", () => closeAppDialog());
+appDialog.addEventListener("click", (ev) => {
+  if (ev.target === appDialog) closeAppDialog();
+});
+sessionLabel.addEventListener("click", () => {
+  const entry = currentEntry();
+  if (entry) void renameSession(entry);
+});
+btnHeaderModel.addEventListener("click", () => openModelPicker());
+headerContext.addEventListener("click", () => {
+  const entry = currentEntry();
+  if (entry) void showContext(entry);
+});
 $("image-lightbox").addEventListener("click", (ev) => {
   if (ev.target === $("image-lightbox")) closeLightbox();
 });
@@ -2869,6 +3312,10 @@ document.addEventListener("keydown", (ev) => {
   if (ev.key === "Escape" && !settingsModal.hidden) {
     ev.preventDefault();
     closeSettings();
+  }
+  if (ev.key === "Escape" && !appDialog.hidden) {
+    ev.preventDefault();
+    closeAppDialog();
   }
 });
 
@@ -2972,11 +3419,23 @@ function runFind(query: string) {
 function openJump() {
   jumpPanel.hidden = false;
   jumpPanel.replaceChildren();
-  timeline.turns().forEach((item, i) => {
+  const head = document.createElement("div");
+  head.className = "queue-pane-head";
+  head.textContent = "跳到某一轮";
+  jumpPanel.append(head);
+  const turns = timeline.turns();
+  if (!turns.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "还没有 turn";
+    jumpPanel.append(empty);
+    return;
+  }
+  turns.forEach((item, i) => {
     const row = document.createElement("button");
     row.type = "button";
     row.className = "history-row";
-    row.textContent = `${i + 1}. ${item.text.slice(0, 80)}`;
+    row.textContent = `${i + 1}. ${item.who}: ${item.text.slice(0, 80)}`;
     row.addEventListener("click", () => {
       timeline.select(item.id);
       timelineNodes.get(item.id)?.scrollIntoView({ block: "start" });
@@ -3031,23 +3490,33 @@ async function ensureFuzzy(query: string) {
   }
 }
 
+function hintFocus(): "composer" | "thread" | "slash" | "other" {
+  if (slashPopoverOpen()) return "slash";
+  const ae = document.activeElement;
+  if (ae === promptEl) return "composer";
+  if (ae instanceof Node && thread.contains(ae)) return "thread";
+  return "other";
+}
+
 function defaultComposerHint(): string {
-  return composerPrefs.enterSends
-    ? "Enter 发送 · Shift+Enter 换行"
-    : "Ctrl+Enter 发送 · Enter 换行";
+  return hintForFocus(hintFocus(), composerPrefs.enterSends);
 }
 
 function syncComposerHint() {
+  if (turnRunning) {
+    hint.textContent = turnStatusEl.textContent || "生成中";
+    return;
+  }
   if (!slashMenu.hidden) {
-    hint.textContent = "Tab 选 · Enter 执行";
+    hint.textContent = hintForFocus("slash", composerPrefs.enterSends);
     return;
   }
   if (!slashPicker.hidden && pickerMode === "model") {
-    hint.textContent = "Enter 应用模型";
+    hint.textContent = "Enter 应用模型 · ? 快捷键";
     return;
   }
   if (!slashPicker.hidden && pickerMode === "theme") {
-    hint.textContent = "点选即预览";
+    hint.textContent = "点选即预览 · Esc 还原";
     return;
   }
   hint.textContent = defaultComposerHint();
@@ -3782,8 +4251,15 @@ document.addEventListener("mouseup", () => {
   selectionBar.style.top = `${range.top + window.scrollY - 36}px`;
 });
 
-promptEl.addEventListener("focus", () => composer.classList.remove("unfocused"));
-promptEl.addEventListener("blur", () => composer.classList.add("unfocused"));
+promptEl.addEventListener("focus", () => {
+  composer.classList.remove("unfocused");
+  syncComposerHint();
+});
+promptEl.addEventListener("blur", () => {
+  composer.classList.add("unfocused");
+  queueMicrotask(syncComposerHint);
+});
+thread.addEventListener("focusin", () => syncComposerHint());
 
 document.addEventListener(
   "keydown",
@@ -3796,6 +4272,16 @@ document.addEventListener("keydown", (ev) => {
   if (ev.key !== "Escape") return;
   if (Date.now() - lastStopAt < 1000) {
     ev.preventDefault();
+    return;
+  }
+  if (!appDialog.hidden) {
+    ev.preventDefault();
+    closeAppDialog();
+    return;
+  }
+  if (!actionModal.hidden) {
+    ev.preventDefault();
+    closeAction();
     return;
   }
   if (!findBar.hidden) {
@@ -3849,7 +4335,8 @@ setConnectedUi(false);
     recentSessions = cached.sessions;
     pendingResumeId = cached.lastId;
     renderSessionList();
-    if (cached.lastId) {
+    const bootRoute = parseHashRoute(location.hash);
+    if (cached.lastId && bootRoute.kind !== "sessions") {
       const row = cached.sessions.find((s) => s.sessionId === cached.lastId);
       sessionLabel.textContent = row ? sessionTitle(row) : cached.lastId;
       showSurface("session");
@@ -3859,6 +4346,26 @@ setConnectedUi(false);
   }
 }
 
+window.addEventListener("hashchange", () => applyHashRoute());
+document.addEventListener("keydown", (ev) => {
+  const action = mapGlobalHotkey(
+    ev.key,
+    { ctrl: ev.ctrlKey, meta: ev.metaKey, shift: ev.shiftKey },
+    isTypingTarget(ev.target),
+  );
+  if (!action) return;
+  if (action === "palette" && appDialogKind === "palette") return;
+  ev.preventDefault();
+  if (action === "palette") openPalette();
+  else if (action === "settings") openSettings();
+  else if (action === "model") openModelPicker();
+  else openShortcutsHelp();
+});
+railPreviewEl.addEventListener("click", () => {
+  const id = railPreviewEl.dataset.id;
+  const item = timeline.items.find((row) => row.id === id);
+  if (item) openBlockPreview(item);
+});
 if (autoConnectEnabled(location.search)) {
   connect().catch(() => {
     /* doctor already shown */
@@ -3930,6 +4437,7 @@ window.__grokWebTest = {
   setTurnRunning: (value) => {
     turnRunning = value;
     syncTurnButtons();
+    syncTurnStatus();
   },
   runLocalSlash: (name, args) => runLocalSlash({ name, args }),
   insertContext: (text) => {

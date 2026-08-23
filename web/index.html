@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <div id="app" class="shell" data-surface="idle" data-phases="" data-sidebar="open" data-composer="center">
+    <div id="app" class="shell" data-catalog="08" data-surface="idle" data-phases="" data-sidebar="open" data-composer="center">
       <aside id="sidebar">
         <div id="sidebar-head">
           <button id="btn-sidebar-toggle" type="button" aria-label="折叠侧栏" title="折叠侧栏">
@@ -102,22 +102,32 @@
 
       <div id="main">
         <header id="main-header">
-          <button id="btn-sidebar-open" type="button" aria-label="打开侧栏" title="打开侧栏">
-            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-              <rect
-                x="1.75"
-                y="2.5"
-                width="12.5"
-                height="11"
-                rx="1.5"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.25"
-              />
-              <path d="M6.25 2.5v11" fill="none" stroke="currentColor" stroke-width="1.25" />
-            </svg>
-          </button>
-          <span class="session" id="session-label">无 session</span>
+          <div class="header-left">
+            <button id="btn-sidebar-open" type="button" aria-label="打开侧栏" title="打开侧栏">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                <rect
+                  x="1.75"
+                  y="2.5"
+                  width="12.5"
+                  height="11"
+                  rx="1.5"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.25"
+                />
+                <path d="M6.25 2.5v11" fill="none" stroke="currentColor" stroke-width="1.25" />
+              </svg>
+            </button>
+            <button type="button" class="session" id="session-label" title="重命名">无 session</button>
+          </div>
+          <div class="header-status" id="header-status">
+            <button type="button" id="btn-header-model">模型</button>
+            <span id="header-yolo" hidden>YOLO</span>
+            <span id="header-plan" hidden></span>
+            <span id="turn-status" hidden>idle</span>
+          </div>
+          <div class="header-right">
+            <button type="button" id="header-context" hidden>上下文</button>
           <div class="header-actions">
             <button id="btn-home" type="button" disabled>回列表</button>
             <details id="session-tools">
@@ -141,6 +151,7 @@
                 <button id="btn-collapse-all" type="button" disabled>全部折叠</button>
               </div>
             </details>
+          </div>
           </div>
         </header>
         <p class="banner" id="banner" hidden></p>
@@ -271,8 +282,8 @@
           <span id="find-count"></span>
           <button type="button" id="btn-find-close">关闭</button>
         </div>
-        <div id="jump-panel" hidden></div>
-        <div id="queue-strip" hidden></div>
+        <div id="jump-panel" class="jump-overlay" hidden></div>
+        <div id="queue-strip" class="queue-pane" hidden></div>
         <div id="follow-ups" hidden></div>
         <p class="nudge" id="plan-nudge" hidden>像在做计划。Shift+Tab 可切 plan mode。</p>
         <div id="block-host">
@@ -341,7 +352,7 @@
       </div>
 
       <div id="settings-modal" hidden>
-        <div class="settings-panel" role="dialog" aria-labelledby="settings-title">
+        <div class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
           <div class="settings-head">
             <h2 id="settings-title">设置</h2>
             <button id="btn-settings-close" type="button">关闭</button>
@@ -429,13 +440,26 @@
       </div>
 
       <div id="action-modal" hidden>
-        <div class="settings-panel" role="dialog">
+        <div class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="action-title">
           <div class="settings-head">
             <h2 id="action-title">会话</h2>
             <button id="btn-action-close" type="button">关闭</button>
           </div>
           <pre id="action-body" class="action-body"></pre>
           <div id="action-list" class="action-list"></div>
+        </div>
+      </div>
+
+      <div id="app-dialog" hidden>
+        <div class="settings-panel app-dialog-panel" role="dialog" aria-modal="true" aria-labelledby="app-dialog-title" tabindex="-1">
+          <div class="settings-head">
+            <h2 id="app-dialog-title">对话框</h2>
+            <div class="dialog-head-actions">
+              <span id="app-dialog-esc" class="dialog-esc" hidden>按 Esc 关闭</span>
+              <button id="btn-app-dialog-close" type="button" aria-label="关闭">×</button>
+            </div>
+          </div>
+          <div id="app-dialog-body" class="app-dialog-body"></div>
         </div>
       </div>
     </div>

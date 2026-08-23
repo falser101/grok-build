@@ -115,6 +115,10 @@ function fill(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
   el.replaceChildren();
   el.classList.toggle("selected", Boolean(item.selected));
   el.onclick = item.kind === "think" ? null : () => handlers.onSelect(item);
+  el.ondblclick = (ev) => {
+    ev.stopPropagation();
+    handlers.onView(item);
+  };
   if (item.kind === "think") {
     const details = el as HTMLDetailsElement;
     const sum = document.createElement("summary");

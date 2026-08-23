@@ -1329,7 +1329,7 @@ function syncComposerChips() {
 function syncHeaderChips() {
   btnHeaderModel.textContent = currentModelName || "模型";
   const yoloOn = sessionPermMode === "yolo" || yoloMode;
-  headerYolo.hidden = false;
+  headerYolo.hidden = !yoloOn;
   headerYolo.dataset.on = yoloOn ? "1" : "0";
   headerYolo.dataset.danger = yoloOn ? "1" : "0";
   headerYolo.textContent = "YOLO";

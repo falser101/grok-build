@@ -3,6 +3,8 @@
 TUI Dashboard = **本 pager 进程**里的顶层 session 花名册（含 fork），不含子 agent。  
 Web 不要抄「进程 roster」：serve 单连接。Web Dashboard = **磁盘 session 列表 + 当前 Agent 上的多 session**（`session/new` 多个 id，或 `x.ai/sessions/list`）。
 
+进全页（D-16）：已实现。`#/dashboard` 选中行 Enter，或预览「打开会话」，进 `#/s/<id>` 全页。Esc / 「回列表」回 dashboard。
+
 关：`GROK_AGENT_DASHBOARD=0`、`[dashboard].enabled=false`、Minimal 隐藏。
 
 | ID | 功能点 | TUI | Web 怎么做 | Web 已实现 |

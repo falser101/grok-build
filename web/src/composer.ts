@@ -1,4 +1,5 @@
 import { buildPromptContentBlocks, type Json } from "./protocol.ts";
+import { LOCAL_SLASH, parseLocalSlash, type LocalSlash, type SlashCommand } from "./slash.ts";
 
 export const PASTE_TEXT_LIMIT = 200_000;
 export const PASTE_IMAGE_LIMIT = 8 * 1024 * 1024;
@@ -6,11 +7,8 @@ export const ENTER_SENDS_KEY = "grok-web.enter-sends";
 export const SHOW_THINKING_KEY = "grok-web.show-thinking";
 export const GROUP_TOOLS_KEY = "grok-web.group-tools";
 
-export type SlashCommand = {
-  name: string;
-  description: string | null;
-  argumentHint: string | null;
-};
+export type { SlashCommand, LocalSlash };
+export { LOCAL_SLASH, parseLocalSlash };
 
 export type PromptBlock =
   | { type: "text"; text: string }
@@ -245,27 +243,6 @@ export function isFollowUpLiteral(text: string): boolean {
   return text.trim().length > 0;
 }
 
-export const LOCAL_SLASH: SlashCommand[] = [
-  { name: "copy", description: "复制最近回复", argumentHint: "n | path" },
-  { name: "find", description: "在对话里查找", argumentHint: "query" },
-  { name: "jump", description: "跳到某一轮", argumentHint: null },
-  { name: "queue", description: "打开队列", argumentHint: null },
-  { name: "context", description: "上下文用量", argumentHint: null },
-  { name: "btw", description: "旁路提问", argumentHint: "question" },
-  { name: "timestamps", description: "开关时间戳", argumentHint: null },
-  { name: "timeline", description: "开关时间线", argumentHint: null },
-  { name: "feedback", description: "发送反馈", argumentHint: null },
-];
-
-export type LocalSlash = { name: string; args: string };
-
-export function parseLocalSlash(text: string): LocalSlash | null {
-  const m = /^\/([a-z][\w-]*)(?:\s+([\s\S]*))?$/i.exec(text.trim());
-  if (!m) return null;
-  const name = m[1]!.toLowerCase();
-  if (!LOCAL_SLASH.some((c) => c.name === name)) return null;
-  return { name, args: (m[2] ?? "").trim() };
-}
 
 export function atQuery(text: string, caret: number): string | null {
   const before = text.slice(0, caret);

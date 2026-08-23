@@ -88,6 +88,18 @@ import {
   type SlashCommand,
 } from "./composer";
 import { applyTheme, loadThemePref, persistThemePref } from "./theme";
+import {
+  LATER_TOAST,
+  applyCompactMode,
+  helpLines,
+  loadCompactMode,
+  mergeSlashMenu,
+  nextThemePref,
+  parseEffortArg,
+  parseThemeArg,
+  planSlash,
+  slashRunsOnAccept,
+} from "./slash";
 import { BlockHost } from "./blocking_view";
 import {
   CANCEL_SUBAGENTS_PREF_KEY,
@@ -304,6 +316,9 @@ const timelineNodes = new Map<string, HTMLElement>();
 const composerPrefs = loadComposerPrefs(localStorage);
 let themePref = loadThemePref(localStorage);
 applyTheme(themePref);
+let compactModeOn = loadCompactMode(localStorage);
+applyCompactMode(compactModeOn, document.documentElement, localStorage);
+let queuePinned = false;
 timeline.opts.showThinking = composerPrefs.showThinking;
 timeline.opts.groupTools = composerPrefs.groupTools;
 timeline.opts.showTimestamps = composerPrefs.showTimestamps;
@@ -1115,6 +1130,7 @@ function handleAgentEvent(method: string, params: Json) {
     if (effect.type === "banner") showBanner(effect.text, effect.reason);
     if (effect.type === "commands") {
       if (snapshot) snapshot.availableCommands = effect.commands;
+      if (!slashMenu.hidden) renderSlashMenu();
     }
     if (effect.type === "queue") applyQueueChanged(effect.params);
     if (effect.type === "follow-ups") renderFollowUps(effect.texts);
@@ -1140,8 +1156,15 @@ function applyQueueChanged(params: Json) {
 }
 
 function renderQueue() {
-  queueStrip.hidden = localQueue.length === 0;
+  queueStrip.hidden = localQueue.length === 0 && !queuePinned;
   queueStrip.replaceChildren();
+  if (localQueue.length === 0 && queuePinned) {
+    const empty = document.createElement("span");
+    empty.className = "queue-item";
+    empty.textContent = "队列为空";
+    queueStrip.append(empty);
+    return;
+  }
   for (const item of localQueue) {
     const row = document.createElement("button");
     row.type = "button";
@@ -1992,9 +2015,62 @@ async function submitComposer(opts: {
 }
 
 async function runLocalSlash(local: { name: string; args: string }): Promise<boolean> {
-  if (local.name === "copy") {
-    const n = local.args && /^\d+$/.test(local.args) ? Number(local.args) : 0;
-    const path = local.args && !/^\d+$/.test(local.args) ? local.args : "";
+  const plan = planSlash(`/${local.name}${local.args ? ` ${local.args}` : ""}`);
+  if (plan.kind === "send" || plan.kind === "pass") return false;
+  if (plan.kind === "later") {
+    showBanner(LATER_TOAST, "slash-later");
+    return true;
+  }
+  if (plan.kind === "forbidden") return true;
+  const name = plan.name;
+  const args = plan.args;
+  const entry = currentEntry();
+  if (name === "exit") {
+    await disconnect();
+    try {
+      window.close();
+    } catch {
+      /* browsers ignore unless script-opened */
+    }
+    showBanner("已断开本页。其它 grok 进程未动。", "exit");
+    return true;
+  }
+  if (name === "help") {
+    openAction("帮助", helpLines());
+    return true;
+  }
+  if (name === "docs") {
+    window.open("https://docs.x.ai", "_blank", "noopener,noreferrer");
+    return true;
+  }
+  if (name === "home" || name === "resume") {
+    leaveSession();
+    return true;
+  }
+  if (name === "new") {
+    showEmpty();
+    await newSession();
+    return true;
+  }
+  if (name === "delete") {
+    if (!entry) {
+      showBanner("没有可删除的会话", "delete");
+      return true;
+    }
+    await deleteSession(entry, false);
+    return true;
+  }
+  if (name === "fork") {
+    if (!entry) {
+      showBanner("没有可分支的会话", "fork");
+      return true;
+    }
+    await forkSession(entry);
+    return true;
+  }
+  if (name === "copy") {
+    const n = args && /^\d+$/.test(args) ? Number(args) : 0;
+    const path = args && !/^\d+$/.test(args) ? args : "";
     const item = timeline.nthAgent(n);
     if (!item) {
       showBanner("没有可复制的回复", "copy");
@@ -2005,28 +2081,47 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
     noteSys(path ? `已导出 ${path}` : "已复制最近回复");
     return true;
   }
-  if (local.name === "find") {
-    openFind(local.args);
+  if (name === "find") {
+    openFind(args);
     return true;
   }
-  if (local.name === "jump") {
+  if (name === "jump") {
     openJump();
     return true;
   }
-  if (local.name === "queue") {
-    queueStrip.hidden = localQueue.length === 0;
+  if (name === "history") {
+    await openPromptHistory();
+    return true;
+  }
+  if (name === "export") {
+    if (!sessionId) {
+      showBanner("没有可导出的会话", "export");
+      return true;
+    }
+    downloadText(`${sessionId}.md`, threadText());
+    return true;
+  }
+  if (name === "transcript") {
+    if (!sessionId) {
+      showBanner("没有可下载的记录", "transcript");
+      return true;
+    }
+    downloadText(`${sessionId}.txt`, threadText());
+    return true;
+  }
+  if (name === "queue") {
+    queuePinned = true;
     renderQueue();
     return true;
   }
-  if (local.name === "context") {
-    const entry = currentEntry();
+  if (name === "context") {
     if (!entry) return true;
     const info = await acpCall("x.ai/session/info", buildSessionInfoParams(entry.sessionId));
     timeline.insertContext(formatSessionInfo(info));
     syncThread();
     return true;
   }
-  if (local.name === "timestamps") {
+  if (name === "timestamps") {
     composerPrefs.showTimestamps = !composerPrefs.showTimestamps;
     timeline.opts.showTimestamps = composerPrefs.showTimestamps;
     showTimestampsEl.checked = composerPrefs.showTimestamps;
@@ -2035,11 +2130,11 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
     syncThread();
     return true;
   }
-  if (local.name === "feedback") {
+  if (name === "feedback") {
     blockHost.offerFeedback();
     return true;
   }
-  if (local.name === "timeline") {
+  if (name === "timeline") {
     composerPrefs.showRail = !composerPrefs.showRail;
     timeline.opts.showRail = composerPrefs.showRail;
     showRailEl.checked = composerPrefs.showRail;
@@ -2047,7 +2142,163 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
     syncThread();
     return true;
   }
-  if (local.name === "btw") return false;
+  if (name === "model") {
+    if (args) {
+      const hit =
+        catalogModels.find((m) => m.id === args || m.name === args) ||
+        catalogModels.find(
+          (m) =>
+            m.id.toLowerCase().includes(args.toLowerCase()) ||
+            m.name.toLowerCase().includes(args.toLowerCase()),
+        );
+      if (!hit) {
+        showBanner(`没有匹配的模型：${args}`, "model");
+        return true;
+      }
+      await setSessionModel(hit.id);
+      return true;
+    }
+    btnModelChip.click();
+    return true;
+  }
+  if (name === "effort") {
+    const effort = parseEffortArg(args);
+    if (effort) {
+      await setSessionModel(currentModelId || catalogModels[0]?.id || "", effort);
+      return true;
+    }
+    if (args) {
+      await sendPrompt(`/effort ${args}`);
+      return true;
+    }
+    btnEffortChip.click();
+    return true;
+  }
+  if (name === "always-approve") {
+    const next = !yoloMode;
+    if (next && !window.confirm("此后本会话的工具不再询问。确定？")) return true;
+    setYoloMode(next);
+    await sendPrompt(next ? "/always-approve" : "/always-approve off");
+    return true;
+  }
+  if (name === "auto") {
+    const next = permissionModeEl.value === "auto" ? "ask" : "auto";
+    permissionModeEl.value = next;
+    permissionModeEl.dispatchEvent(new Event("change"));
+    return true;
+  }
+  if (name === "multiline") {
+    composerPrefs.enterSends = !composerPrefs.enterSends;
+    enterSendsEl.checked = composerPrefs.enterSends;
+    persistComposerPrefs(composerPrefs, localStorage);
+    hint.textContent = composerPrefs.enterSends
+      ? "Enter 发送 · Shift+Enter 换行"
+      : "Ctrl+Enter 发送 · Enter 换行";
+    return true;
+  }
+  if (name === "compact-mode") {
+    compactModeOn = !compactModeOn;
+    applyCompactMode(compactModeOn, document.documentElement, localStorage);
+    showBanner(compactModeOn ? "已开紧凑模式" : "已关紧凑模式", "compact-mode");
+    return true;
+  }
+  if (name === "theme") {
+    const named = parseThemeArg(args);
+    themePref = named ?? nextThemePref(themePref);
+    themePrefEl.value = themePref;
+    persistThemePref(themePref, localStorage);
+    applyTheme(themePref);
+    return true;
+  }
+  if (name === "rename") {
+    if (!entry) {
+      showBanner("没有可重命名的会话", "rename");
+      return true;
+    }
+    if (args) {
+      await acpCall(
+        "x.ai/session/rename",
+        buildSessionRenameParams({
+          sessionId: entry.sessionId,
+          title: args,
+          cwd: entry.cwd,
+          kind: entry.adminKind,
+        }),
+      );
+      await refreshSessions();
+      return true;
+    }
+    await renameSession(entry);
+    return true;
+  }
+  if (name === "session-info") {
+    if (!entry) {
+      showBanner("没有会话信息", "info");
+      return true;
+    }
+    await showInfo(entry);
+    return true;
+  }
+  if (name === "login") {
+    if (authenticated) {
+      showBanner("已经登录", "login");
+      return true;
+    }
+    renderLogin();
+    await startInteractiveLogin();
+    return true;
+  }
+  if (name === "logout") {
+    await logout({ acp: true });
+    return true;
+  }
+  if (name === "rewind") {
+    if (!entry) {
+      await sendPrompt(args ? `/rewind ${args}` : "/rewind");
+      return true;
+    }
+    await rewindSession(entry);
+    return true;
+  }
+  if (name === "settings") {
+    openSettings();
+    return true;
+  }
+  if (name === "share") {
+    if (!entry) {
+      showBanner(LATER_TOAST, "slash-later");
+      return true;
+    }
+    await shareSession(entry);
+    return true;
+  }
+  if (name === "recap") {
+    if (!entry) {
+      showBanner(LATER_TOAST, "slash-later");
+      return true;
+    }
+    await recapSession(entry, false);
+    return true;
+  }
+  if (name === "doctor") {
+    if (acp.connected) {
+      showBanner("连接正常。连不上 serve 时这里会做诊断。", "doctor");
+      return true;
+    }
+    showDoctor(new Error("未连接"));
+    return true;
+  }
+  if (name === "cd") {
+    if (args) {
+      if (!window.confirm("改 cwd 只影响之后的新会话，不会移动当前 session。继续？")) return true;
+      cwd.value = args;
+      persistFields();
+      showBanner(`新会话将使用 ${cwd.value}`, "cwd");
+      return true;
+    }
+    await changeCwd();
+    return true;
+  }
   return false;
 }
 
@@ -2771,14 +3022,14 @@ function renderSlashMenu() {
     slashMenu.hidden = true;
     return;
   }
-  const commands: SlashCommand[] = [
-    ...LOCAL_SLASH,
-    ...(snapshot?.availableCommands ?? []).map((c) => ({
+  const commands: SlashCommand[] = mergeSlashMenu(
+    LOCAL_SLASH,
+    (snapshot?.availableCommands ?? []).map((c) => ({
       name: c.name,
       description: c.description,
       argumentHint: c.argumentHint,
     })),
-  ];
+  );
   slashItems = filterSlashCommands(commands, q);
   slashIndex = Math.min(slashIndex, Math.max(0, slashItems.length - 1));
   slashMenu.hidden = slashItems.length === 0;
@@ -2801,6 +3052,14 @@ function renderSlashMenu() {
 }
 
 function acceptSlash(cmd: SlashCommand) {
+  if (slashRunsOnAccept(cmd)) {
+    hidePopovers();
+    promptEl.value = "";
+    void submitComposer({ text: `/${cmd.name}` }).catch((e) =>
+      showBanner(e instanceof Error ? e.message : String(e)),
+    );
+    return;
+  }
   promptEl.value = applySlashAccept(promptEl.value, cmd);
   hidePopovers();
   promptEl.focus();

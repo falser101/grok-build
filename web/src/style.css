@@ -2815,3 +2815,26 @@ mark.find-hit {
 }
 
 
+
+
+html[data-compact="1"] {
+  --gutter: 0.7rem;
+  --radius: 6px;
+  --sidebar-width: 220px;
+}
+
+html[data-compact="1"] #main-header,
+html[data-compact="1"] #composer,
+html[data-compact="1"] .bubble {
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+}
+
+html[data-compact="1"] .slash-row,
+html[data-compact="1"] .history-row {
+  padding: 0.28rem 0.55rem;
+}
+
+html[data-compact="1"] #sidebar #btn-new {
+  padding: 0.4rem 0.65rem;
+}

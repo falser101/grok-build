@@ -22,7 +22,7 @@ Web 不要抄「进程 roster」：serve 单连接。Web Dashboard = **磁盘 se
 | D-13 | 置顶 | `Ctrl+T`；Shift+↑↓ 调序 | 同 | 是 |
 | D-14 | 停/删 | `Ctrl+X`：运行中取消 turn；否则 2s 内再按永久删。hover `[✗]` | 两按钮分开更清晰 | 是 |
 | D-15 | YOLO per row | `Ctrl+O` 对选中 agent | 行菜单 | 是 |
-| D-16 | 详情全宽 | Enter 空回复打开；顶栏 name `{i}/{n}` `[Dashboard]`；无边框 modal | 全页 conversation，返回列表 | 是 |
+| D-16 | 详情全宽 | Enter 空回复打开；顶栏 name `{i}/{n}` `[Dashboard]`；无边框 modal | 全页 conversation，选中 Enter 与预览打开进 `#/s/id` | 是 |
 | D-17 | 详情里 Ctrl+X | 运行=取消；否则武装关会话 | 同 | 否 |
 | D-18 | 详情 Esc | 只回 Dashboard；`/exit` 才关 session（toast Session closed） | 路由返回 | 是 |
 | D-19 | 循环 agent | `[‹]` `[›]` | 快捷键 | 否 |

@@ -864,6 +864,9 @@ function renderDashRow(entry: SessionListEntry, status: ReturnType<typeof inferD
 async function openDashSession(entry: SessionListEntry) {
   dashSelectedId = entry.sessionId;
   await openListedSession(entry);
+  showSurface("session");
+  writeSessionHash();
+  applyComposerGate();
 }
 
 async function stopDashSession(entry: SessionListEntry) {
@@ -2273,7 +2276,12 @@ async function handshake(resume: boolean): Promise<void> {
 }
 
 async function openListedSession(entry: SessionListEntry): Promise<void> {
-  if (entry.sessionId === sessionId && !timeline.replayActive && timeline.items.length) return;
+  if (entry.sessionId === sessionId && !timeline.replayActive && timeline.items.length) {
+    showSurface("session");
+    writeSessionHash();
+    applyComposerGate();
+    return;
+  }
   if (turnRunning && sessionId && sessionId !== entry.sessionId) {
     const ok = window.confirm("当前对话还在生成。停止并打开另一个会话？");
     if (!ok) return;
@@ -2322,8 +2330,8 @@ async function loadSession(
       });
   if (!reconnect) {
     lastEventId = null;
-    setSession(id);
     showSurface("session");
+    setSession(id);
     timeline.beginReplay();
     syncThread();
     renderSessionList();
@@ -4907,6 +4915,21 @@ $("dash-new-form").addEventListener("submit", (ev) => {
     if (text) await submitComposer({ text });
   })().catch((e) => showBanner(e instanceof Error ? e.message : String(e)));
 });
+document.addEventListener(
+  "keydown",
+  (ev) => {
+    if (app.dataset.surface !== "dashboard") return;
+    if (ev.key !== "Enter") return;
+    const t = ev.target;
+    if (t === dashSearch || t === dashPeekInput || t === dashNewInput) return;
+    const entry = selectedDashEntry();
+    if (!entry) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    void openDashSession(entry);
+  },
+  true,
+);
 document.addEventListener("keydown", (ev) => {
   const cmd = ev.ctrlKey || ev.metaKey;
   if (cmd && (ev.key === "\\" || ev.code === "Backslash")) {
@@ -4965,14 +4988,6 @@ document.addEventListener("keydown", (ev) => {
       ev.preventDefault();
       setYoloMode(!yoloMode);
       renderDashboard();
-    }
-    return;
-  }
-  if (ev.key === "Enter" && !isTypingTarget(ev.target)) {
-    const entry = selectedDashEntry();
-    if (entry) {
-      ev.preventDefault();
-      void openDashSession(entry);
     }
     return;
   }

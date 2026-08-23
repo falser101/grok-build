@@ -157,18 +157,26 @@ import {
 } from "./session_ops";
 import {
   DASH_COLLAPSE_KEY,
+  DASH_GROUP_LABEL,
   DASH_HELP_SHORTCUTS,
+  DASH_PAGE_TITLE,
   DASH_PIN_KEY,
+  DASH_STATUS_PHRASE,
   DASH_TITLE,
+  applyRosterChanged,
   buildDashGroups,
   dashDotKind,
   inferDashStatus,
   loadIdSet,
-  peekTailLines,
+  parseRosterChanged,
+  parseRosterList,
+  peekTailBubbles,
+  rosterToSessionEntry,
   saveIdSet,
   togglePinned,
   type DashLive,
   type DashSort,
+  type RosterEntry,
 } from "./dashboard";
 /** Old Slice-0 default; treating it as unset so we don't pin the list to this repo. */
 const LEGACY_REPO_CWD = "/home/falser/Projects/grok-build";
@@ -327,7 +335,10 @@ const sessionIndexList = $("session-index-list");
 const dashboardEl = $("dashboard");
 const dashList = $("dash-list");
 const dashSearch = $<HTMLInputElement>("dash-search");
+const dashPeek = $("dash-peek");
 const dashPeekBody = $("dash-peek-body");
+const dashPeekMeta = $("dash-peek-meta");
+const dashPeekSub = $("dash-peek-sub");
 const dashPeekInput = $<HTMLInputElement>("dash-peek-input");
 const dashNewInput = $<HTMLInputElement>("dash-new-input");
 const appDialog = $("app-dialog");
@@ -389,6 +400,9 @@ let dashPins = loadIdSet(localStorage, DASH_PIN_KEY);
 let dashCollapsed = loadIdSet(localStorage, DASH_COLLAPSE_KEY);
 if (!localStorage.getItem(DASH_COLLAPSE_KEY)) dashCollapsed.add("inactive");
 const backgroundIds = new Set<string>();
+const loadedIds = new Set<string>();
+let dashRoster: RosterEntry[] = [];
+let dashDeleteArmed: { id: string; at: number } | null = null;
 let paletteItems: PaletteItem[] = [];
 let paletteIndex = 0;
 let paletteQuery = "";
@@ -577,14 +591,35 @@ function showSessionIndex() {
 }
 
 function dashLive(): DashLive {
+  const roster = new Map(dashRoster.map((row) => [row.sessionId, { activity: row.activity, resident: row.resident }]));
+  const loaded = new Set(loadedIds);
+  if (sessionId) loaded.add(sessionId);
+  for (const row of dashRoster) {
+    if (row.resident) loaded.add(row.sessionId);
+  }
   return {
     currentSessionId: sessionId,
     turnRunning,
     queued: localQueue.length > 0,
     blocked: blockHost.busy,
     backgroundIds,
+    loadedIds: loaded,
+    roster: roster.size ? roster : undefined,
     now: Date.now(),
   };
+}
+
+function dashSessionRows(): SessionListEntry[] {
+  if (dashRoster.length) {
+    const mapped = dashRoster.map(rosterToSessionEntry);
+    const seen = new Set(mapped.map((s) => s.sessionId));
+    for (const extra of recentSessions) {
+      if (seen.has(extra.sessionId)) continue;
+      mapped.push(extra);
+    }
+    return mapped;
+  }
+  return recentSessions;
 }
 
 function noteBackgroundWork(method: string, params: unknown) {
@@ -609,28 +644,60 @@ function noteBackgroundWork(method: string, params: unknown) {
 
 function selectedDashEntry(): SessionListEntry | null {
   if (!dashSelectedId) return null;
-  return recentSessions.find((s) => s.sessionId === dashSelectedId) ?? null;
+  return dashSessionRows().find((s) => s.sessionId === dashSelectedId) ?? null;
 }
 
 function paintDashPeek() {
   const entry = selectedDashEntry();
+  dashPeek.hidden = !entry;
+  const body = dashboardEl.querySelector(".dash-body");
+  if (body instanceof HTMLElement) body.dataset.peek = entry ? "1" : "0";
+  dashPeekBody.replaceChildren();
   if (!entry) {
-    dashPeekBody.textContent = "选中一行可预览 LastTurnSummary，并回复。";
+    dashPeekMeta.textContent = "";
+    dashPeekSub.textContent = "";
     return;
   }
-  const bits = [entry.lastTurnSummary, entry.cwd, entry.sessionId].filter(Boolean);
-  let tail = bits.join("\n");
-  if (entry.sessionId === sessionId) {
-    const live = peekTailLines(timeline.items, 6);
-    if (live) tail = `${tail}\n\n${live}`;
+  const status = inferDashStatus(entry, dashLive());
+  const title = sessionTitle(entry);
+  dashPeekMeta.replaceChildren();
+  const metaDot = document.createElement("span");
+  metaDot.className = "dash-dot";
+  metaDot.dataset.kind = dashDotKind(status);
+  metaDot.dataset.status = status;
+  dashPeekMeta.append(metaDot, document.createTextNode(` ${title} · ${DASH_STATUS_PHRASE[status]}`));
+  dashPeekSub.textContent = entry.lastTurnSummary || "";
+  const bubbles = entry.sessionId === sessionId
+    ? peekTailBubbles(timeline.items, 6)
+    : entry.lastTurnSummary
+      ? [{ role: "assistant" as const, text: entry.lastTurnSummary }]
+      : [];
+  if (!bubbles.length) {
+    const empty = document.createElement("p");
+    empty.className = "dash-empty";
+    empty.textContent = "暂无尾部对话。";
+    dashPeekBody.append(empty);
+    return;
   }
-  dashPeekBody.textContent = tail || "（无预览）";
+  for (const bubble of bubbles) {
+    const el = document.createElement("div");
+    el.className = "dash-bubble";
+    el.dataset.role = bubble.role;
+    if (bubble.time) {
+      const time = document.createElement("time");
+      time.textContent = bubble.time;
+      el.append(time);
+    }
+    el.append(document.createTextNode(bubble.text));
+    dashPeekBody.append(el);
+  }
 }
 
 function showDashboard() {
   renderDashboard();
   showSurface("dashboard");
-  hint.textContent = `${DASH_TITLE} · Ctrl+/ 搜索 · Enter 打开 · Esc 回列表`;
+  hint.textContent = `${DASH_PAGE_TITLE} · ${DASH_TITLE} · Ctrl+/ 搜索 · Enter 打开 · Esc 回列表`;
+  document.title = `${DASH_PAGE_TITLE} · Grok Web`;
   applyComposerGate();
   const next = hashForDashboard();
   if (location.hash !== next) {
@@ -638,20 +705,25 @@ function showDashboard() {
     history.replaceState(null, "", `${location.pathname}${location.search}${next}`);
     hashSyncing = false;
   }
+  void refreshRoster();
 }
 
 function renderDashboard() {
   dashList.replaceChildren();
+  const rows = dashSessionRows();
   if (!authenticated) {
-    const p = document.createElement("p");
-    p.className = "dash-empty";
-    p.textContent = "登录后可查看运行中会话。";
-    dashList.append(p);
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 3;
+    td.className = "dash-empty";
+    td.textContent = "登录后可查看运行中会话。";
+    tr.append(td);
+    dashList.append(tr);
     paintDashPeek();
     return;
   }
   const groups = buildDashGroups({
-    sessions: recentSessions,
+    sessions: rows,
     live: dashLive(),
     pins: dashPins,
     query: dashQuery,
@@ -659,46 +731,50 @@ function renderDashboard() {
     idleExpanded: dashIdleExpanded,
   });
   if (!groups.length) {
-    const p = document.createElement("p");
-    p.className = "dash-empty";
-    p.textContent = recentSessions.length ? "没有匹配的会话。" : "还没有会话。用底栏开新会话。";
-    dashList.append(p);
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 3;
+    td.className = "dash-empty";
+    td.textContent = rows.length ? "没有匹配的会话。" : "还没有会话。用底栏开新会话。";
+    tr.append(td);
+    dashList.append(tr);
     paintDashPeek();
     return;
   }
-  if (dashSelectedId && !recentSessions.some((s) => s.sessionId === dashSelectedId)) {
+  if (dashSelectedId && !rows.some((s) => s.sessionId === dashSelectedId)) {
     dashSelectedId = groups[0]?.rows[0]?.sessionId ?? null;
   }
   for (const group of groups) {
-    const wrap = document.createElement("section");
-    wrap.className = "dash-group";
-    wrap.dataset.status = group.status;
     const collapsed = dashCollapsed.has(group.status);
-    const head = document.createElement("button");
-    head.type = "button";
-    head.className = "dash-group-head";
-    head.textContent = `${group.label} · ${group.rows.length + group.overflow}`;
-    head.addEventListener("click", () => {
+    const head = document.createElement("tr");
+    head.className = "dash-group-row";
+    head.dataset.status = group.status;
+    head.dataset.collapsed = collapsed ? "1" : "0";
+    const cell = document.createElement("td");
+    cell.colSpan = 3;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "dash-group-toggle";
+    const chev = document.createElement("span");
+    chev.className = "dash-chevron";
+    chev.textContent = "▾";
+    btn.append(chev, document.createTextNode(`${group.label} (${group.rows.length + group.overflow})`));
+    btn.addEventListener("click", () => {
       dashCollapsed = togglePinned(dashCollapsed, group.status);
       saveIdSet(localStorage, DASH_COLLAPSE_KEY, dashCollapsed);
       renderDashboard();
     });
-    wrap.append(head);
-    if (collapsed && group.status === "inactive") {
-      dashList.append(wrap);
-      continue;
-    }
-    if (collapsed && group.status !== "inactive") {
-      /* other groups stay open unless user folded */
-    }
-    if (collapsed) {
-      dashList.append(wrap);
-      continue;
-    }
+    cell.append(btn);
+    head.append(cell);
+    dashList.append(head);
+    if (collapsed) continue;
     for (const entry of group.rows) {
-      wrap.append(renderDashRow(entry, inferDashStatus(entry, dashLive())));
+      dashList.append(renderDashRow(entry, inferDashStatus(entry, dashLive())));
     }
     if (group.overflow > 0) {
+      const moreTr = document.createElement("tr");
+      const moreTd = document.createElement("td");
+      moreTd.colSpan = 3;
       const more = document.createElement("button");
       more.type = "button";
       more.className = "dash-more";
@@ -707,11 +783,15 @@ function renderDashboard() {
         dashIdleExpanded = true;
         renderDashboard();
       });
-      wrap.append(more);
+      moreTd.append(more);
+      moreTr.append(moreTd);
+      dashList.append(moreTr);
     }
-    dashList.append(wrap);
   }
-  if (sessionListCursor) {
+  if (sessionListCursor && !dashRoster.length) {
+    const moreTr = document.createElement("tr");
+    const moreTd = document.createElement("td");
+    moreTd.colSpan = 3;
     const more = document.createElement("button");
     more.type = "button";
     more.className = "dash-load-more";
@@ -719,38 +799,34 @@ function renderDashboard() {
     more.addEventListener("click", () => {
       void loadMoreSessions();
     });
-    dashList.append(more);
+    moreTd.append(more);
+    moreTr.append(moreTd);
+    dashList.append(moreTr);
   }
   paintDashPeek();
 }
 
 function renderDashRow(entry: SessionListEntry, status: ReturnType<typeof inferDashStatus>): HTMLElement {
-  const row = document.createElement("div");
+  const row = document.createElement("tr");
   row.className = "dash-row";
   row.dataset.sessionId = entry.sessionId;
   row.setAttribute("aria-selected", entry.sessionId === dashSelectedId ? "true" : "false");
+  const statusTd = document.createElement("td");
   const dot = document.createElement("span");
   dot.className = "dash-dot";
   dot.dataset.kind = dashDotKind(status);
   dot.dataset.status = status;
-  const main = document.createElement("button");
-  main.type = "button";
-  main.className = "dash-row-main";
+  dot.title = DASH_GROUP_LABEL[status];
+  statusTd.append(dot);
+  const mainTd = document.createElement("td");
   const title = document.createElement("span");
   title.className = "dash-row-title";
   title.textContent = `${dashPins.has(entry.sessionId) ? "★ " : ""}${sessionTitle(entry)}`;
   const sub = document.createElement("span");
   sub.className = "dash-row-sub";
-  sub.textContent = entry.lastTurnSummary || entry.cwd || entry.sessionId.slice(0, 8);
-  main.append(title, sub);
-  main.addEventListener("click", () => {
-    dashSelectedId = entry.sessionId;
-    paintDashPeek();
-    renderDashboard();
-  });
-  main.addEventListener("dblclick", () => {
-    void openDashSession(entry);
-  });
+  sub.textContent = entry.lastTurnSummary || "";
+  mainTd.append(title, sub);
+  const actsTd = document.createElement("td");
   const acts = document.createElement("div");
   acts.className = "dash-row-actions";
   const mk = (label: string, fn: () => void) => {
@@ -764,40 +840,24 @@ function renderDashRow(entry: SessionListEntry, status: ReturnType<typeof inferD
     });
     return b;
   };
-  const working = status === "working";
   acts.append(
-    mk(dashPins.has(entry.sessionId) ? "取消置顶" : "置顶", () => {
-      dashPins = togglePinned(dashPins, entry.sessionId);
-      saveIdSet(localStorage, DASH_PIN_KEY, dashPins);
-      renderDashboard();
+    mk("停", () => {
+      void stopDashSession(entry);
     }),
-    mk("重命名", () => {
-      void renameSession(entry);
-    }),
-  );
-  if (entry.sessionId === sessionId) {
-    acts.append(
-      mk(yoloMode ? "YOLO✓" : "YOLO", () => {
-        const next = !yoloMode;
-        if (next && !window.confirm("此后本会话的工具不再询问。确定？")) return;
-        setYoloMode(next);
-        renderDashboard();
-      }),
-    );
-  }
-  if (working) {
-    acts.append(
-      mk("停止", () => {
-        void stopDashSession(entry);
-      }),
-    );
-  }
-  acts.append(
-    mk("删除", () => {
+    mk("删", () => {
       void deleteSession(entry, true);
     }),
   );
-  row.append(dot, main, acts);
+  actsTd.append(acts);
+  row.append(statusTd, mainTd, actsTd);
+  row.addEventListener("click", (ev) => {
+    if (ev.target instanceof HTMLElement && ev.target.closest("button")) return;
+    dashSelectedId = entry.sessionId;
+    renderDashboard();
+  });
+  row.addEventListener("dblclick", () => {
+    void openDashSession(entry);
+  });
   return row;
 }
 
@@ -819,6 +879,19 @@ async function stopDashSession(entry: SessionListEntry) {
   }
   backgroundIds.delete(entry.sessionId);
   renderDashboard();
+}
+
+async function refreshRoster(): Promise<void> {
+  if (!acp.connected || !authenticated) return;
+  try {
+    dashRoster = parseRosterList(await acpCall("x.ai/sessions/list", {}));
+    for (const row of dashRoster) {
+      if (row.resident) loadedIds.add(row.sessionId);
+    }
+    if (app.dataset.surface === "dashboard") renderDashboard();
+  } catch {
+    /* serve without roster: fall back to disk list already in recentSessions */
+  }
 }
 
 async function loadMoreSessions() {
@@ -1588,6 +1661,11 @@ function handleAgentEvent(method: string, params: Json) {
     }
   }
   if (method === "x.ai/sessions/changed") {
+    const delta = parseRosterChanged(params);
+    if (delta.upserted.length || delta.removed.length) {
+      dashRoster = applyRosterChanged(dashRoster, delta);
+    }
+    void refreshRoster();
     void refreshSessions();
     return;
   }
@@ -2346,6 +2424,7 @@ function persistSessionCache(lastId: string | null = sessionId) {
 
 function setSession(id: string) {
   sessionId = id;
+  loadedIds.add(id);
   const row = recentSessions.find((s) => s.sessionId === id);
   const summary = row?.summary.trim();
   sessionLabel.textContent = summary && summary !== id ? summary : id;
@@ -3000,6 +3079,7 @@ function leaveSession() {
       /* close is best-effort */
     });
   }
+  if (id) loadedIds.delete(id);
   titlePinned = false;
   clearSessionView();
   persistSessionCache(null);
@@ -4805,6 +4885,19 @@ $("dash-peek-open").addEventListener("click", () => {
   const entry = selectedDashEntry();
   if (entry) void openDashSession(entry);
 });
+$("dash-peek-stop").addEventListener("click", () => {
+  const entry = selectedDashEntry();
+  if (entry) void stopDashSession(entry);
+});
+dashPeekInput.addEventListener("keydown", (ev) => {
+  if ((ev.ctrlKey || ev.metaKey) && (ev.key === "s" || ev.key === "S")) {
+    ev.preventDefault();
+    const text = dashPeekInput.value.trim();
+    if (!text) return;
+    dashPeekInput.value = "";
+    void peekSend(text).catch((e) => showBanner(e instanceof Error ? e.message : String(e)));
+  }
+});
 $("dash-new-form").addEventListener("submit", (ev) => {
   ev.preventDefault();
   const text = dashNewInput.value.trim();
@@ -4819,6 +4912,25 @@ document.addEventListener("keydown", (ev) => {
   if (cmd && (ev.key === "\\" || ev.code === "Backslash")) {
     ev.preventDefault();
     showDashboard();
+    return;
+  }
+  if (cmd && (ev.key === "x" || ev.key === "X") && app.dataset.surface === "dashboard") {
+    ev.preventDefault();
+    const entry = selectedDashEntry();
+    if (!entry) return;
+    const status = inferDashStatus(entry, dashLive());
+    if (status === "working" || (entry.sessionId === sessionId && turnRunning)) {
+      void stopDashSession(entry);
+      return;
+    }
+    const nowTs = Date.now();
+    if (dashDeleteArmed && dashDeleteArmed.id === entry.sessionId && nowTs - dashDeleteArmed.at < 2000) {
+      dashDeleteArmed = null;
+      void deleteSession(entry, true);
+    } else {
+      dashDeleteArmed = { id: entry.sessionId, at: nowTs };
+      showBanner("再按一次 Ctrl+X 永久删除", "dashboard");
+    }
     return;
   }
   if (cmd && ev.key === "/" && app.dataset.surface === "dashboard") {
@@ -4872,11 +4984,33 @@ document.addEventListener("keydown", (ev) => {
     if (!ids.length) return;
     const i = Math.max(0, ids.indexOf(dashSelectedId ?? ""));
     const next = ev.key === "ArrowDown" ? Math.min(ids.length - 1, i + 1) : Math.max(0, i - 1);
-    dashSelectedId = ids[next] ?? null;
+    const nextId = ids[next] ?? null;
+    if (ev.shiftKey && nextId && dashSelectedId && dashPins.has(dashSelectedId)) {
+      const order = [...dashPins];
+      const a = order.indexOf(dashSelectedId);
+      const b = order.indexOf(nextId);
+      if (a >= 0) {
+        if (b >= 0) {
+          const tmp = order[a]!;
+          order[a] = order[b]!;
+          order[b] = tmp;
+        } else {
+          const dest = ev.key === "ArrowDown" ? Math.min(order.length, a + 1) : Math.max(0, a - 1);
+          const [moved] = order.splice(a, 1);
+          if (moved) order.splice(dest, 0, moved);
+        }
+        dashPins = new Set(order);
+        saveIdSet(localStorage, DASH_PIN_KEY, dashPins);
+      }
+    }
+    dashSelectedId = nextId;
     renderDashboard();
   }
 });
 document.addEventListener("keydown", (ev) => {
+  if (app.dataset.surface === "dashboard" && (ev.ctrlKey || ev.metaKey) && (ev.key === "x" || ev.key === "X")) {
+    return;
+  }
   const action = mapGlobalHotkey(
     ev.key,
     { ctrl: ev.ctrlKey, meta: ev.metaKey, shift: ev.shiftKey },

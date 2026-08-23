@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <div id="app" class="shell" data-catalog="08" data-surface="idle" data-phases="" data-sidebar="open" data-composer="center">
+    <div id="app" class="shell" data-catalog="09" data-surface="idle" data-phases="" data-sidebar="open" data-composer="center">
       <aside id="sidebar">
         <div id="sidebar-head">
           <button id="btn-sidebar-toggle" type="button" aria-label="折叠侧栏" title="折叠侧栏">
@@ -239,23 +239,51 @@
 
           <section class="surface dashboard" id="dashboard" hidden>
             <div class="dash-head">
-              <h2>运行中会话</h2>
-              <p class="muted dash-sub">磁盘会话 + 当前连接上的多会话，不是 Agent 定义（/config-agents）。</p>
-              <label class="dash-search-wrap">
-                <span class="sr-only">搜索运行中会话</span>
-                <input id="dash-search" spellcheck="false" autocomplete="off" placeholder="搜索标题 / 摘要 / id" />
-              </label>
+              <div class="dash-head-row">
+                <div>
+                  <h2>会话</h2>
+                  <p class="muted dash-sub">运行中会话 · 磁盘 + 当前连接，不是 Agent 定义（/config-agents）</p>
+                </div>
+                <label class="dash-search-wrap">
+                  <span class="sr-only">搜索</span>
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                    <circle cx="6.5" cy="6.5" r="4.25" fill="none" stroke="currentColor" stroke-width="1.4" />
+                    <path d="M9.6 9.6 13 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                  </svg>
+                  <input id="dash-search" spellcheck="false" autocomplete="off" placeholder="搜索" />
+                </label>
+              </div>
             </div>
-            <div class="dash-body">
-              <div id="dash-list" role="list"></div>
-              <aside id="dash-peek" class="dash-peek">
-                <h3>预览</h3>
-                <pre id="dash-peek-body" class="dash-peek-body"></pre>
+            <div class="dash-body" data-peek="0">
+              <div class="dash-table-wrap">
+                <table class="dash-table">
+                  <thead>
+                    <tr>
+                      <th class="dash-col-status">状态</th>
+                      <th class="dash-col-session">会话</th>
+                      <th class="dash-col-ops">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dash-list"></tbody>
+                </table>
+              </div>
+              <aside id="dash-peek" class="dash-peek" hidden>
+                <header class="dash-peek-head">
+                  <div>
+                    <h3>预览</h3>
+                    <p id="dash-peek-meta" class="dash-peek-meta"></p>
+                    <p id="dash-peek-sub" class="dash-peek-sub"></p>
+                  </div>
+                  <div class="dash-peek-head-actions">
+                    <button type="button" id="dash-peek-stop">停</button>
+                    <button type="button" id="dash-peek-open" aria-label="打开会话" title="打开会话">↗</button>
+                  </div>
+                </header>
+                <div id="dash-peek-body" class="dash-peek-body"></div>
                 <form id="dash-peek-form" class="dash-peek-form">
-                  <input id="dash-peek-input" spellcheck="false" autocomplete="off" placeholder="回复此会话…" />
+                  <input id="dash-peek-input" spellcheck="false" autocomplete="off" placeholder="回复…" />
                   <button type="submit" id="dash-peek-send">发送</button>
                 </form>
-                <button type="button" id="dash-peek-open">进会话发送</button>
               </aside>
             </div>
             <form id="dash-new-form" class="dash-new">

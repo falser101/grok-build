@@ -2,13 +2,20 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { parseHashRoute, hashForDashboard } from "./palette.ts";
 import {
+  DASH_GROUP_LABEL,
   DASH_GROUP_ORDER,
+  DASH_PAGE_TITLE,
   DASH_TITLE,
+  applyRosterChanged,
   buildDashGroups,
   dashMatches,
   dashStatusRank,
   inferDashStatus,
   parseDashboardHash,
+  parseRosterList,
+  peekTailBubbles,
+  rosterActivityToStatus,
+  rosterToSessionEntry,
   sortDashRows,
   togglePinned,
   type DashLive,
@@ -41,6 +48,7 @@ function live(over: Partial<DashLive> = {}): DashLive {
     queued: false,
     blocked: false,
     backgroundIds: new Set(),
+    loadedIds: new Set(["live-1"]),
     now,
     ...over,
   };
@@ -53,6 +61,12 @@ test("status rank follows catalog group order", () => {
   assert.ok(dashStatusRank("idle") < dashStatusRank("inactive"));
   assert.ok(dashStatusRank("inactive") < dashStatusRank("completed"));
   assert.ok(dashStatusRank("completed") < dashStatusRank("failed"));
+  assert.equal(DASH_GROUP_LABEL.needs, "需要输入");
+  assert.equal(DASH_GROUP_LABEL.working, "进行中");
+  assert.equal(DASH_GROUP_LABEL.idle, "空闲");
+  assert.equal(DASH_GROUP_LABEL.inactive, "未加载");
+  assert.equal(DASH_GROUP_LABEL.completed, "已完成");
+  assert.equal(DASH_GROUP_LABEL.failed, "失败");
 });
 
 test("inferDashStatus uses live flags and disk inactivity", () => {
@@ -67,10 +81,55 @@ test("inferDashStatus uses live flags and disk inactivity", () => {
     "working",
   );
   assert.equal(inferDashStatus(current, live()), "idle");
-  assert.equal(inferDashStatus(recent, live()), "idle");
+  assert.equal(inferDashStatus(recent, live({ loadedIds: new Set(["live-1", "idle-1"]) })), "idle");
+  assert.equal(inferDashStatus(recent, live()), "inactive");
   assert.equal(inferDashStatus(disk, live()), "inactive");
   assert.equal(inferDashStatus(entry({ sessionId: "d", sessionKind: "completed" }), live()), "completed");
   assert.equal(inferDashStatus(entry({ sessionId: "f", sessionKind: "failed" }), live()), "failed");
+});
+
+test("roster activity maps dormant to 未加载", () => {
+  assert.equal(rosterActivityToStatus("needs_input", true), "needs");
+  assert.equal(rosterActivityToStatus("working", true), "working");
+  assert.equal(rosterActivityToStatus("idle", true), "idle");
+  assert.equal(rosterActivityToStatus("dormant", false), "inactive");
+  assert.equal(rosterActivityToStatus("idle", false), "inactive");
+  assert.equal(rosterActivityToStatus("completed", false), "completed");
+  assert.equal(rosterActivityToStatus("dead", false), "failed");
+  const row = entry({ sessionId: "disk-9", summary: "旧会话" });
+  const roster = new Map([["disk-9", { activity: "dormant" as const, resident: false }]]);
+  assert.equal(inferDashStatus(row, live({ roster, currentSessionId: null, loadedIds: new Set() })), "inactive");
+});
+
+test("parseRosterList unwraps result envelope", () => {
+  const rows = parseRosterList({
+    result: {
+      sessions: [
+        {
+          sessionId: "sess-abc",
+          title: "修登录",
+          cwd: "/repo",
+          activity: "needs_input",
+          lastTurnSummary: "需要你提供账号",
+          resident: true,
+          lastChangeUnixMs: 1_725_000_000_123,
+        },
+      ],
+    },
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.sessionId, "sess-abc");
+  assert.equal(rows[0]?.title, "修登录");
+  assert.equal(rows[0]?.activity, "needs_input");
+  assert.equal(rows[0]?.resident, true);
+  const mapped = rosterToSessionEntry(rows[0]!);
+  assert.equal(mapped.summary, "修登录");
+  assert.equal(mapped.lastTurnSummary, "需要你提供账号");
+  const next = applyRosterChanged(rows, {
+    upserted: [],
+    removed: ["sess-abc"],
+  });
+  assert.equal(next.length, 0);
 });
 
 test("buildDashGroups orders groups and pins first within a group", () => {
@@ -83,7 +142,7 @@ test("buildDashGroups orders groups and pins first within a group", () => {
   ];
   const groups = buildDashGroups({
     sessions,
-    live: live({ turnRunning: true }),
+    live: live({ turnRunning: true, loadedIds: new Set(["live-1", "idle-a", "idle-b"]) }),
     pins: new Set(["idle-a"]),
   });
   assert.deepEqual(
@@ -94,6 +153,7 @@ test("buildDashGroups orders groups and pins first within a group", () => {
   const idle = groups.find((g) => g.status === "idle");
   assert.equal(idle?.rows[0]?.sessionId, "idle-a");
   assert.equal(DASH_TITLE, "运行中会话");
+  assert.equal(DASH_PAGE_TITLE, "会话");
 });
 
 test("filter matches title, summary, and id", () => {
@@ -108,7 +168,7 @@ test("filter matches title, summary, and id", () => {
   assert.equal(dashMatches(row, "nope"), false);
   const groups = buildDashGroups({
     sessions: [row, entry({ sessionId: "other", summary: "zzz" })],
-    live: live({ currentSessionId: null }),
+    live: live({ currentSessionId: null, loadedIds: new Set() }),
     pins: new Set(),
     query: "oauth",
   });
@@ -140,9 +200,10 @@ test("idle overflow beyond recent 8 / 1h", () => {
       updatedAt: new Date(now - (i + 1) * 60 * 1000).toISOString(),
     }),
   );
+  const loadedIds = new Set(sessions.map((s) => s.sessionId));
   const groups = buildDashGroups({
     sessions,
-    live: live({ currentSessionId: null }),
+    live: live({ currentSessionId: null, loadedIds }),
     pins: new Set(),
   });
   const idle = groups.find((g) => g.status === "idle");
@@ -150,12 +211,26 @@ test("idle overflow beyond recent 8 / 1h", () => {
   assert.ok(idle!.overflow > 0);
   const expanded = buildDashGroups({
     sessions,
-    live: live({ currentSessionId: null }),
+    live: live({ currentSessionId: null, loadedIds }),
     pins: new Set(),
     idleExpanded: true,
   });
   assert.equal(expanded.find((g) => g.status === "idle")?.overflow, 0);
   assert.equal(expanded.find((g) => g.status === "idle")?.rows.length, 12);
+});
+
+test("peek bubbles take conversation tail, not a dump", () => {
+  const bubbles = peekTailBubbles(
+    [
+      { kind: "sys", text: "boot" },
+      { kind: "agent", text: "我将写测试", timestamp: Date.parse("2026-08-24T10:15:00") },
+      { kind: "user", text: "先从注册开始", timestamp: Date.parse("2026-08-24T10:16:00") },
+    ],
+    6,
+  );
+  assert.equal(bubbles.length, 2);
+  assert.equal(bubbles[0]?.role, "assistant");
+  assert.equal(bubbles[1]?.role, "user");
 });
 
 test("hash parse recognizes #/dashboard", () => {

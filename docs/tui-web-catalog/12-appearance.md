@@ -9,7 +9,7 @@
 | V-05 | Oscura Midnight | 需 truecolor | 同 | 否。**备注：Oscura 待讨论后再做。** |
 | V-06 | theme=auto | 跟 OS：macOS/Linux portal/Windows；SSH `GROK_APPEARANCE`/`LC_*`；OSC 11 | `prefers-color-scheme` + 手动覆盖 | 是：设置三钮「跟随系统 / 深色 / 浅色」即时整页换；默认 auto |
 | V-07 | auto_dark/light_theme | 映射具体主题 | 设置两套 | 否（N/A）：Web 只有深/浅/跟随系统 |
-| V-08 | `/theme` 预览 | 箭头即时预览，Esc 还原 | 悬停预览 | 是：`/theme` 同 store；点选预览，Esc 还原；设置三钮即时换 |
+| V-08 | `/theme` 预览 | 箭头即时预览，Esc 还原 | 悬停预览 | 是：`/theme` 与设置共用 `applyTheme`/`persistThemePref`（无参循环 auto→dark→light，有参直接设）；设置三钮即时整页换 |
 | V-09 | GROK_THEME env | 强制 | Web 用 localStorage | 是：localStorage `grok-web.theme`；`/theme` 与设置共用 `applyTheme` |
 | V-10 | NO_COLOR | 单色 | 尊重；Web 少见 | 否（N/A） |
 | V-11 | 颜色量化 | 启动按 16/256/truecolor | 不需要 | 否（N/A） |

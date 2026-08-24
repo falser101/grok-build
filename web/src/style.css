@@ -689,7 +689,7 @@ body {
 }
 
 .mast-dot[data-state="busy"] {
-  background: #cfcfcf;
+  background: var(--ink);
   animation: pulse 1.4s ease-in-out infinite;
 }
 
@@ -1303,7 +1303,7 @@ button:disabled {
   padding: 0;
   list-style: none;
   font-size: 0.78rem;
-  color: #7a7a7a;
+  color: var(--muted);
 }
 
 .tool-members li {
@@ -1513,6 +1513,8 @@ button:disabled {
   max-height: 12rem;
   overflow-y: auto;
   background: transparent;
+  color: var(--ink);
+  caret-color: var(--accent);
   border: 0;
   border-radius: 0;
   padding: 0.2rem 0.35rem;
@@ -1813,8 +1815,8 @@ code {
 }
 
 .card.paywall {
-  border-color: #4a2c28;
-  background: #1a1010;
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg-2));
 }
 
 .card a {
@@ -2206,8 +2208,8 @@ code {
 
 .bubble.credit {
   align-self: center;
-  border: 1px solid #4a2c28;
-  background: #1a1010;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg-2));
   padding: 0.7rem 0.9rem;
   border-radius: 10px;
 }
@@ -2366,8 +2368,8 @@ code {
 
 .slash-badge-skill {
   border: 0;
-  background: #6a6a6a;
-  color: #f0f0f0;
+  background: var(--bg-3);
+  color: var(--ink);
 }
 
 .slash-row-meta {
@@ -3218,8 +3220,8 @@ html[data-theme="light"] .ansi-cyan { color: #0e7474; }
 
 
 mark.find-hit {
-  background: #6a542e;
-  color: inherit;
+  background: color-mix(in srgb, var(--edit) 42%, var(--bg-3));
+  color: var(--ink);
 }
 
 
@@ -3330,7 +3332,7 @@ html[data-compact="1"] #sidebar #btn-new {
 }
 
 #header-context[data-hot="1"] {
-  color: #e6b450;
+  color: var(--edit);
 }
 
 #header-yolo {
@@ -3594,7 +3596,7 @@ html[data-compact="1"] #sidebar #btn-new {
 }
 
 .usage-bar > span[data-key="system"] {
-  background: #7a7a7a;
+  background: var(--muted);
 }
 
 .usage-bar > span[data-key="tools"] {
@@ -3602,7 +3604,7 @@ html[data-compact="1"] #sidebar #btn-new {
 }
 
 .usage-bar > span[data-key="other"] {
-  background: #6a7a98;
+  background: color-mix(in srgb, var(--accent) 55%, var(--muted));
 }
 
 .usage-bar > span[data-key="free"] {

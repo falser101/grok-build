@@ -129,6 +129,7 @@ import {
   applyCompactMode,
   loadCompactMode,
   mergeSlashMenu,
+  nextThemePref,
   parseEffortArg,
   parseThemeArg,
   planSlash,
@@ -3256,11 +3257,10 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
   }
   if (name === "theme") {
     const named = parseThemeArg(args);
-    if (named) {
-      applyThemeChoice(named, true);
-      return true;
-    }
-    openThemePicker();
+    const next = named ?? nextThemePref(themePref);
+    applyThemeChoice(next, true);
+    const labels = { auto: "跟随系统", dark: "深色", light: "浅色" } as const;
+    showBanner(`外观：${labels[next]}`, "theme");
     return true;
   }
   if (name === "rename") {
@@ -4852,7 +4852,9 @@ function slashPopoverOpen(): boolean {
 function syncThemePrefUi(pref: "auto" | "dark" | "light") {
   for (const btn of themePrefEl.querySelectorAll<HTMLButtonElement>("[data-theme-pref]")) {
     const id = btn.dataset.themePref;
-    btn.setAttribute("aria-selected", id === pref ? "true" : "false");
+    const on = id === pref;
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+    btn.setAttribute("aria-checked", on ? "true" : "false");
   }
 }
 
@@ -4967,24 +4969,6 @@ async function openHeaderModelMenu() {
       void setSessionModel(m.id);
     });
     headerModelMenu.append(row);
-  }
-}
-
-function openThemePicker() {
-  closeSlashPicker(false);
-  slashMenu.hidden = true;
-  pickerMode = "theme";
-  themePreviewOrig = themePref;
-  pickerItems = [
-    { id: "light", label: "浅", current: themePref === "light" },
-    { id: "dark", label: "暗", current: themePref === "dark" },
-    { id: "auto", label: "系统", current: themePref === "auto" },
-  ];
-  pickerIndex = Math.max(0, pickerItems.findIndex((m) => m.current));
-  renderPicker();
-  const cur = pickerItems[pickerIndex];
-  if (cur && (cur.id === "auto" || cur.id === "dark" || cur.id === "light")) {
-    applyThemeChoice(cur.id, false);
   }
 }
 

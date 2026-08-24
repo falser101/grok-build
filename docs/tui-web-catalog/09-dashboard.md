@@ -25,14 +25,14 @@ Web 不要抄「进程 roster」：serve 单连接。Web Dashboard = **磁盘 se
 | D-14 | 停/删 | `Ctrl+X`：运行中取消 turn；否则 2s 内再按永久删。hover `[✗]` | 两按钮分开更清晰 | 是 |
 | D-15 | YOLO per row | `Ctrl+O` 对选中 agent | 行菜单 | 是 |
 | D-16 | 详情全宽 | Enter 空回复打开；顶栏 name `{i}/{n}` `[Dashboard]`；无边框 modal | 全页 conversation，选中 Enter 与预览打开进 `#/s/id` | 是 |
-| D-17 | 详情里 Ctrl+X | 运行=取消；否则武装关会话 | 同 | 否 |
+| D-17 | 详情里 Ctrl+X | 运行=取消；否则武装关会话 | 同 | 否。**备注：详情页 Ctrl+X 关会话 待讨论后再做（已有删除按钮）。** |
 | D-18 | 详情 Esc | 只回 Dashboard；`/exit` 才关 session（toast Session closed） | 路由返回 | 是 |
-| D-19 | 循环 agent | `[‹]` `[›]` | 快捷键 | 否 |
-| D-20 | Esc 阶梯 | 搜→关 peek→清过滤→失焦 dispatch→取消选中→退出。不擦 dispatch 草稿 | 同 | 否 |
+| D-19 | 循环 agent | `[‹]` `[›]` | 快捷键 | 否。**备注：详情里左右切会话 待讨论后再做（侧栏已能点）。** |
+| D-20 | Esc 阶梯 | 搜→关 peek→清过滤→失焦 dispatch→取消选中→退出。不擦 dispatch 草稿 | 同 | 部分：Esc 回列表。**备注：完整 Esc 阶梯 {NOTE}。** |
 | D-21 | 分组折叠记忆 | 打开期间记；Inactive 每次启动默认折 | localStorage | 是 |
 | D-22 | 点击 Inactive 标题 | 展开/折 | 同 | 是 |
 | D-23 | 帮助 | `Ctrl+.` / `?` | 同 | 是 |
-| D-24 | Peek 权限/提问 | 嵌 B- 卡；1-9 | 同组件 | 否 |
+| D-24 | Peek 权限/提问 | 嵌 B- 卡；1-9 | 同组件 | 否。**备注：peek 内嵌权限/提问卡 待讨论后再做。** |
 | D-25 | 禁用 | env/config/Minimal | Web 可始终有列表页 | 是 |
 | D-26 | LastTurnSummary 副行 | 通知填活动说明 | 列表 subtitle | 是 |
 | D-27 | FetchDashboardSessions / FetchRoster | ACP 拉列表 | `x.ai/sessions/list` + changed | 是 |

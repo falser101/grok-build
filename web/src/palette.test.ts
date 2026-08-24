@@ -85,21 +85,24 @@ test("context usage and slash args", () => {
     }),
   );
   assert.deepEqual(grouped.map((g) => g.label), ["快捷键", "slash", "skill"]);
-  assert.deepEqual(HELP_SHORTCUTS, APP_SHORTCUTS);
-  const helpKeys = HELP_SHORTCUTS.map((s) => s.keys);
-  for (const keys of ["Ctrl+Enter", "Shift+Tab", "Ctrl+;", "Ctrl+,", "Ctrl+\\", "?", "Ctrl+.", "Ctrl+P", "Ctrl+M", "Esc"]) {
-    assert.ok(helpKeys.includes(keys), keys);
-  }
-  assert.ok(HELP_SHORTCUTS.some((s) => s.keys === "Ctrl+Enter" && s.title === "立即发送"));
-  assert.ok(HELP_SHORTCUTS.some((s) => s.keys === "Shift+Tab" && s.title === "模式"));
-  assert.ok(HELP_SHORTCUTS.some((s) => s.keys === "Ctrl+;" && s.title === "队列"));
-  assert.ok(HELP_SHORTCUTS.some((s) => s.keys === "Ctrl+," && s.title === "设置"));
-  assert.ok(HELP_SHORTCUTS.some((s) => s.keys === "Ctrl+\\" && s.title === "Dashboard"));
-  assert.ok(HELP_SHORTCUTS.some((s) => s.keys === "?" && s.title === "速查"));
-  assert.ok(HELP_SHORTCUTS.some((s) => s.keys === "Ctrl+." && s.title === "速查"));
-  assert.ok(HELP_SHORTCUTS.some((s) => s.keys === "Ctrl+P" && s.title === "命令面板"));
-  assert.ok(HELP_SHORTCUTS.some((s) => s.keys === "Ctrl+M" && s.title === "模型"));
-  assert.ok(HELP_SHORTCUTS.some((s) => s.keys === "Esc"));
+  assert.equal(HELP_SHORTCUTS.length, 7);
+  assert.deepEqual(
+    HELP_SHORTCUTS.map((s) => [s.keys, s.title]),
+    [
+      ["Ctrl+P", "面板"],
+      ["Ctrl+Enter", "立即发送"],
+      ["Shift+Tab", "模式"],
+      ["Ctrl+;", "队列"],
+      ["Ctrl+,", "设置"],
+      ["? / Ctrl+.", "速查"],
+      ["Ctrl+\\", "总览"],
+    ],
+  );
+  assert.ok(HELP_SHORTCUTS.some((s) => s.title === "总览"));
+  assert.equal(HELP_SHORTCUTS.at(-1)?.title, "总览");
+  assert.ok(!HELP_SHORTCUTS.some((s) => s.title === "Dashboard"));
+  assert.ok(HELP_SHORTCUTS.some((s) => s.keys === "Ctrl+P" && s.title === "面板"));
+  assert.ok(!HELP_SHORTCUTS.some((s) => s.keys === "Esc"));
   assert.ok(!HELP_SHORTCUTS.some((s) => s.keys === "Ctrl+X"));
   assert.ok(!HELP_SHORTCUTS.some((s) => s.keys === "Ctrl+B"));
   assert.ok(!HELP_SHORTCUTS.some((s) => s.keys === "Ctrl+T"));

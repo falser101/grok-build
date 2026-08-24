@@ -71,8 +71,16 @@ export const PALETTE_SHORTCUTS: ShortcutRow[] = APP_SHORTCUTS.filter((row) =>
   ["palette", "shortcuts-dot", "settings", "model"].includes(row.id),
 );
 
-/** U-05 快捷键页：真实绑定，与 APP_SHORTCUTS 同一份。 */
-export const HELP_SHORTCUTS: ShortcutRow[] = APP_SHORTCUTS;
+/** U-05 快捷键页：七行速查，会话页不含 Esc 行与 DASH extras。 */
+export const HELP_SHORTCUTS: ShortcutRow[] = [
+  { id: "palette", keys: "Ctrl+P", title: "面板", run: "palette" },
+  { id: "send-now", keys: "Ctrl+Enter", title: "立即发送", run: "send-now" },
+  { id: "mode", keys: "Shift+Tab", title: "模式", run: "mode" },
+  { id: "queue", keys: "Ctrl+;", title: "队列", run: "queue" },
+  { id: "settings", keys: "Ctrl+,", title: "设置", run: "settings" },
+  { id: "shortcuts", keys: "? / Ctrl+.", title: "速查", run: "shortcuts" },
+  { id: "dashboard", keys: "Ctrl+\\", title: "总览", run: "dashboard" },
+];
 
 export const PALETTE_GROUP_LABEL: Record<PaletteKind, string> = {
   shortcut: "快捷键",

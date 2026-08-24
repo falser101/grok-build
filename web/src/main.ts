@@ -277,6 +277,7 @@ const promptEl = $<HTMLTextAreaElement>("prompt");
 const thread = $<HTMLElement>("thread");
 const liveWaitEl = $("live-wait");
 const banner = $<HTMLElement>("banner");
+const escHint = $<HTMLElement>("esc-hint");
 const warningsEl = $("startup-warnings");
 const connDot = $("conn-dot");
 const connLabel = $("conn-label");
@@ -1494,6 +1495,7 @@ function persistFields() {
 }
 
 function syncTurnButtons() {
+  syncEscStopHint();
   btnStop.hidden = !turnRunning;
   turnActionsEl.hidden = !(turnRunning && localQueue.length > 0);
   btnSend.hidden = false;
@@ -1730,6 +1732,33 @@ acp.onNotification = (method, params) => {
 let canceling = false;
 let lastCancelSubagents = true;
 let lastEscArm: EscArm = null;
+let escHintTimer = 0;
+
+function hideEscHint() {
+  if (escHintTimer) {
+    window.clearTimeout(escHintTimer);
+    escHintTimer = 0;
+  }
+  escHint.hidden = true;
+  escHint.textContent = "";
+}
+
+function showEscHint(text: string, persist = false) {
+  escHint.textContent = text;
+  escHint.hidden = false;
+  if (escHintTimer) window.clearTimeout(escHintTimer);
+  escHintTimer = 0;
+  if (!persist) escHintTimer = window.setTimeout(hideEscHint, 1000);
+}
+
+function syncEscStopHint() {
+  if (lastEscArm) return;
+  if (turnRunning || canceling) {
+    showEscHint("Esc 停止", true);
+    return;
+  }
+  if (escHint.textContent === "Esc 停止") hideEscHint();
+}
 const blockHost = new BlockHost(blockCard, blockPill, {
   onYolo: () => setYoloMode(true),
   onRejectNote: (text) => {
@@ -4446,15 +4475,18 @@ function openShortcutsHelp() {
   for (const row of [...HELP_SHORTCUTS, ...extra]) {
     const line = document.createElement("div");
     line.className = "shortcut-row";
-    const keys = document.createElement("kbd");
-    keys.textContent = row.keys;
     const title = document.createElement("span");
     title.textContent = row.title;
-    line.append(keys, title);
+    const keys = document.createElement("kbd");
+    keys.textContent = row.keys;
+    line.append(title, keys);
     grid.append(line);
   }
-  appDialogBody.append(grid);
-  showAppDialog("快捷键", "shortcuts");
+  const foot = document.createElement("p");
+  foot.className = "shortcut-foot";
+  foot.textContent = "Esc 关闭";
+  appDialogBody.append(grid, foot);
+  showAppDialog("速查", "shortcuts");
 }
 
 function openBlockPreview(item: (typeof timeline.items)[number]) {
@@ -5716,29 +5748,36 @@ document.addEventListener(
       now: Date.now(),
       graceMs: 1000,
     });
-    if (action.type === "none") return;
+    if (action.type === "none") {
+      hideEscHint();
+      return;
+    }
     ev.preventDefault();
     ev.stopPropagation();
     if (action.type === "overlay" && overlay) {
+      hideEscHint();
       closeEscOverlay(overlay);
       return;
     }
     if (action.type === "stop") {
       const pref = parseCancelSubagentsPref(localStorage.getItem(CANCEL_SUBAGENTS_PREF_KEY));
       stopTurn(pref !== "always_continue");
+      showEscHint("Esc 停止", true);
       return;
     }
     if (action.type === "recancel") {
       notifySessionCancel(lastCancelSubagents);
+      showEscHint("Esc 停止", true);
       return;
     }
     if (action.type === "arm-clear") {
       lastEscArm = { kind: "clear", at: Date.now() };
-      showBanner("再按 Esc 清空输入（1 秒）", "esc");
+      showEscHint("再按 Esc 清空 · 1 秒");
       return;
     }
     if (action.type === "clear") {
       lastEscArm = null;
+      hideEscHint();
       promptEl.value = "";
       hidePopovers();
       syncComposerFilled();
@@ -5747,11 +5786,12 @@ document.addEventListener(
     }
     if (action.type === "arm-rewind") {
       lastEscArm = { kind: "rewind", at: Date.now() };
-      showBanner("再按 Esc 撤回上一轮（1 秒）", "esc");
+      showEscHint("再按 Esc 撤回 · 1 秒");
       return;
     }
     if (action.type === "rewind") {
       lastEscArm = null;
+      hideEscHint();
       const entry = currentEntry();
       if (entry) void rewindSession(entry);
     }

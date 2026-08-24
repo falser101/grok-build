@@ -92,7 +92,7 @@ export function patchTimelineItem(
     el.dataset.replay = "true";
   }
   bubble.classList.toggle("selected", Boolean(item.selected));
-  if (patchStreamingBody(bubble, item)) {
+  if (patchStreamingBody(bubble, item, handlers)) {
     if (el.classList.contains("turn-user")) syncUserThumbs(el, item, handlers);
     return;
   }
@@ -100,7 +100,19 @@ export function patchTimelineItem(
   if (el.classList.contains("turn-user")) syncUserThumbs(el, item, handlers);
 }
 
-function patchStreamingBody(el: HTMLElement, item: TimelineItem): boolean {
+function wantsReplyFeedback(item: TimelineItem): boolean {
+  return item.kind === "agent" && Boolean((item.text || item.raw || "").trim());
+}
+
+function ensureReplyFeedback(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers): boolean {
+  if (!wantsReplyFeedback(item)) return true;
+  if (el.querySelector(":scope > .feedback-block")) return true;
+  if (!item.feedback) item.feedback = "pending";
+  el.append(feedbackActions(item, handlers, () => fill(el, item, handlers)));
+  return true;
+}
+
+function patchStreamingBody(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers): boolean {
   if (item.kind !== "agent" && item.kind !== "think" && item.kind !== "btw") return false;
   if (item.images?.length || item.videos?.length) return false;
   const body = el.querySelector(":scope > .body") as HTMLElement | null;
@@ -113,10 +125,10 @@ function patchStreamingBody(el: HTMLElement, item: TimelineItem): boolean {
   if (item.kind === "agent" && el.dataset.raw === "1") {
     const pre = body.querySelector("pre") ?? body;
     pre.textContent = item.raw;
-    return true;
+    return ensureReplyFeedback(el, item, handlers);
   }
   applyMarkdownStream(body, item.text);
-  return true;
+  return ensureReplyFeedback(el, item, handlers);
 }
 
 function fill(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
@@ -253,7 +265,8 @@ function fill(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
     });
     el.append(close);
   }
-  if (item.kind === "agent" && !item.replay && item.feedback) {
+  if (wantsReplyFeedback(item)) {
+    if (!item.feedback) item.feedback = "pending";
     el.append(feedbackActions(item, handlers, () => fill(el, item, handlers)));
   }
 }

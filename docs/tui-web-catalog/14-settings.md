@@ -55,6 +55,6 @@
 | G-49 | fork_secondary_model | Models | fork 用副模型 | 下拉 | 否。**备注：fork 副模型 待讨论后再做。** |
 | G-50 | 设置搜索 | 关键字过滤 | 同 | 否。**备注：设置搜索 待讨论后再做。** |
 | G-51 | 设置 preview | theme 等 supports_preview 逐键预览，Enter 提交 | 同 | 部分：主题即时生效。**备注：逐键 preview 协议 {NOTE}。** |
-| G-52 | 设置分类 | Appearance Editor Mouse Agent Models Privacy Advanced | 同 IA | 部分：现在是一页平铺。**备注：分组 IA {NOTE}。** |
+| G-52 | 设置分类 | Appearance Editor Mouse Agent Models Privacy Advanced | 同 IA | 是：现网设置模态分组外观 / 编辑 / 权限 / 工作目录。没造隐私组。没设置搜索。 |
 | G-53 | Minimal 藏行 | hidden_in_minimal | Web 用 N/A 列藏 | 否（N/A） |
 | G-54 | persist 失败 toast | 写 toml 错 | 展示错误 | 是：失败横幅 |

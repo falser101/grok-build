@@ -54,7 +54,6 @@ export const APP_SHORTCUTS: ShortcutRow[] = [
   { id: "palette", keys: "Ctrl+P", title: "命令面板", run: "palette" },
   { id: "shortcuts", keys: "?", title: "快捷键", run: "shortcuts" },
   { id: "shortcuts-dot", keys: "Ctrl+.", title: "快捷键帮助", run: "shortcuts" },
-  { id: "shortcuts-x", keys: "Ctrl+X", title: "快捷键（无 KKP）", run: "shortcuts" },
   { id: "settings", keys: "Ctrl+,", title: "设置", run: "settings" },
   { id: "model", keys: "Ctrl+M", title: "模型", run: "model" },
   { id: "enter", keys: "Enter", title: "发送 / 执行 slash", run: "enter" },
@@ -70,16 +69,8 @@ export const PALETTE_SHORTCUTS: ShortcutRow[] = APP_SHORTCUTS.filter((row) =>
   ["palette", "shortcuts-dot", "settings", "model"].includes(row.id),
 );
 
-/** U-05 快捷键页两列（贴帧）。 */
-export const HELP_SHORTCUTS: ShortcutRow[] = [
-  { id: "palette", keys: "Ctrl+P", title: "命令面板", run: "palette" },
-  { id: "slash", keys: "/", title: "Slash", run: "slash" },
-  { id: "tab", keys: "Tab", title: "补全", run: "tab" },
-  { id: "model", keys: "Ctrl+M", title: "模型", run: "model" },
-  { id: "page", keys: "Ctrl+.", title: "本页", run: "shortcuts" },
-  { id: "file", keys: "@", title: "文件", run: "at" },
-  { id: "esc", keys: "Esc", title: "关闭", run: "esc" },
-];
+/** U-05 快捷键页：真实绑定，与 APP_SHORTCUTS 同一份。 */
+export const HELP_SHORTCUTS: ShortcutRow[] = APP_SHORTCUTS;
 
 export const PALETTE_GROUP_LABEL: Record<PaletteKind, string> = {
   shortcut: "快捷键",
@@ -342,7 +333,7 @@ export function mapGlobalHotkey(
   if (key === "F2" && !typing) return "settings";
   if (cmd && (key === "m" || key === "M") && !typing) return "model";
   if (!typing && key === "?") return "shortcuts";
-  if (!typing && cmd && (key === "." || key === "x" || key === "X")) return "shortcuts";
+  if (!typing && cmd && key === ".") return "shortcuts";
   if (cmd && key === ";") return "queue";
   return null;
 }

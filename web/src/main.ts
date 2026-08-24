@@ -124,6 +124,7 @@ import {
   turnStatusLabel,
   type PaletteItem,
 } from "./palette";
+import { nextEscAction, type EscArm } from "./esc";
 import {
   LATER_TOAST,
   applyCompactMode,
@@ -759,6 +760,7 @@ function endTurn(sid: string | null) {
   }
   if (!sid || sid === sessionId) {
     turnRunning = false;
+    canceling = false;
     syncTurnButtons();
     syncTurnStatus();
     if (sessionId) void refreshContextChip(sessionId);
@@ -1725,7 +1727,8 @@ acp.onNotification = (method, params) => {
   handleAgentEvent(method, params);
 };
 
-let lastStopAt = 0;
+let canceling = false;
+let lastEscArm: EscArm = null;
 const blockHost = new BlockHost(blockCard, blockPill, {
   onYolo: () => setYoloMode(true),
   onRejectNote: (text) => {
@@ -1748,17 +1751,22 @@ const blockHost = new BlockHost(blockCard, blockPill, {
 });
 syncTurnStatus();
 
-function stopTurn(cancelSubagents: boolean) {
+function notifySessionCancel(cancelSubagents: boolean) {
   if (!sessionId) return;
   try {
     acp.notify("session/cancel", buildSessionCancelParams(sessionId, { cancelSubagents }));
   } catch {
     /* ignore */
   }
+}
+
+function stopTurn(cancelSubagents: boolean) {
+  if (!sessionId) return;
+  notifySessionCancel(cancelSubagents);
   turnRunning = false;
+  canceling = true;
   syncTurnButtons();
   syncTurnStatus();
-  lastStopAt = Date.now();
   hint.textContent = cancelSubagents ? "已停止，草稿保留" : "已停止这次，子 agent 还在跑";
 }
 
@@ -2756,6 +2764,7 @@ async function loadSession(
   if (reconnect) noteSys(`已重连 session ${id}`);
   if (backgroundIds.has(id)) {
     turnRunning = true;
+    canceling = false;
     syncTurnButtons();
     syncTurnStatus();
   }
@@ -3405,6 +3414,7 @@ async function sendPrompt(
   if (text.trim()) sentHistory.unshift(text.trim());
   setState("busy", "session/prompt…");
   turnRunning = true;
+  canceling = false;
   syncTurnButtons();
   syncTurnStatus();
   followUpsEl.hidden = true;
@@ -3428,6 +3438,7 @@ async function sendPrompt(
   } finally {
     if (epoch === promptEpoch && sessionId === promptSid) {
       turnRunning = false;
+      canceling = false;
       syncTurnButtons();
       syncTurnStatus();
     }
@@ -4600,11 +4611,6 @@ $("lightbox-next").addEventListener("click", (ev) => {
 });
 document.addEventListener("keydown", (ev) => {
   if ($("image-lightbox").hidden) return;
-  if (ev.key === "Escape") {
-    ev.preventDefault();
-    closeLightbox();
-    return;
-  }
   if (ev.key === "ArrowLeft") {
     ev.preventDefault();
     stepLightbox(-1);
@@ -4616,16 +4622,6 @@ document.addEventListener("keydown", (ev) => {
 });
 settingsModal.addEventListener("click", (ev) => {
   if (ev.target === settingsModal) closeSettings();
-});
-document.addEventListener("keydown", (ev) => {
-  if (ev.key === "Escape" && !settingsModal.hidden) {
-    ev.preventDefault();
-    closeSettings();
-  }
-  if (ev.key === "Escape" && !appDialog.hidden) {
-    ev.preventDefault();
-    closeAppDialog();
-  }
 });
 
 btnContinue.addEventListener("click", () => {
@@ -5582,11 +5578,6 @@ document.addEventListener("pointerdown", (ev) => {
 });
 sessionListEl.addEventListener("scroll", () => closeSessionPopover(), { passive: true });
 window.addEventListener("resize", () => closeSessionPopover());
-document.addEventListener("keydown", (ev) => {
-  if (ev.key !== "Escape" || sessionPopover.hidden) return;
-  ev.preventDefault();
-  closeSessionPopover();
-});
 
 btnInterject.addEventListener("click", () => {
   const text = promptEl.value.trim();
@@ -5649,6 +5640,53 @@ promptEl.addEventListener("blur", () => {
 });
 thread.addEventListener("focusin", () => syncComposerHint());
 
+function firstEscOverlay(): string | null {
+  if (!$("image-lightbox").hidden) return "lightbox";
+  if (!settingsModal.hidden) return "settings";
+  if (!appDialog.hidden) return "appDialog";
+  if (!actionModal.hidden) return "actionModal";
+  if (!findBar.hidden) return "findBar";
+  if (!jumpPanel.hidden) return "jumpPanel";
+  if (!helpCard.hidden) return "helpCard";
+  if (slashPopoverOpen() || !promptHistoryEl.hidden || !atMenu.hidden) return "composer";
+  if (!sessionPopover.hidden) return "sessionPopover";
+  const btw = timeline.items.find((it) => it.kind === "btw" && it.open !== false);
+  if (btw) return "btw";
+  if (app.dataset.surface === "dashboard") {
+    if (dashQuery) return "dash-search";
+    if (dashSelectedId) return "dash-select";
+  }
+  return null;
+}
+
+function closeEscOverlay(id: string) {
+  if (id === "lightbox") closeLightbox();
+  else if (id === "settings") closeSettings();
+  else if (id === "appDialog") closeAppDialog();
+  else if (id === "actionModal") closeAction();
+  else if (id === "findBar") findBar.hidden = true;
+  else if (id === "jumpPanel") jumpPanel.hidden = true;
+  else if (id === "helpCard") closeHelpCard();
+  else if (id === "composer") {
+    closeSlashPicker(true);
+    hidePopovers();
+  } else if (id === "sessionPopover") closeSessionPopover();
+  else if (id === "btw") {
+    const btw = timeline.items.find((it) => it.kind === "btw" && it.open !== false);
+    if (btw) {
+      timeline.dismissBtw(btw.id);
+      syncThread();
+    }
+  } else if (id === "dash-search") {
+    dashQuery = "";
+    dashSearch.value = "";
+    renderDashboard();
+  } else if (id === "dash-select") {
+    dashSelectedId = null;
+    renderDashboard();
+  }
+}
+
 document.addEventListener(
   "keydown",
   (ev) => {
@@ -5656,61 +5694,59 @@ document.addEventListener(
   },
   true,
 );
-document.addEventListener("keydown", (ev) => {
-  if (ev.key !== "Escape") return;
-  if (Date.now() - lastStopAt < 1000) {
+document.addEventListener(
+  "keydown",
+  (ev) => {
+    if (ev.key !== "Escape") return;
+    const overlay = firstEscOverlay();
+    const action = nextEscAction({
+      overlay,
+      turnRunning,
+      canceling,
+      draft: promptEl.value.trim(),
+      hasMessages: timeline.items.some((it) => it.kind === "user" || it.kind === "agent"),
+      lastArm: lastEscArm,
+      now: Date.now(),
+      graceMs: 1000,
+    });
+    if (action.type === "none") return;
     ev.preventDefault();
-    return;
-  }
-  if (!appDialog.hidden) {
-    ev.preventDefault();
-    closeAppDialog();
-    return;
-  }
-  if (!actionModal.hidden) {
-    ev.preventDefault();
-    closeAction();
-    return;
-  }
-  if (!findBar.hidden) {
-    findBar.hidden = true;
-    ev.preventDefault();
-    return;
-  }
-  if (!jumpPanel.hidden) {
-    jumpPanel.hidden = true;
-    ev.preventDefault();
-    return;
-  }
-  if (!helpCard.hidden) {
-    closeHelpCard();
-    ev.preventDefault();
-    return;
-  }
-  const btw = timeline.items.find((it) => it.kind === "btw" && it.open !== false);
-  if (btw) {
-    timeline.dismissBtw(btw.id);
-    syncThread();
-    ev.preventDefault();
-    return;
-  }
-  if (app.dataset.surface === "dashboard") {
-    if (dashQuery) {
-      dashQuery = "";
-      dashSearch.value = "";
-      renderDashboard();
-    } else if (dashSelectedId) {
-      dashSelectedId = null;
-      renderDashboard();
+    ev.stopPropagation();
+    if (action.type === "overlay" && overlay) {
+      closeEscOverlay(overlay);
+      return;
     }
-    ev.preventDefault();
-    return;
-  }
-  if (app.dataset.surface === "session") {
-    ev.preventDefault();
-    showDashboard();
-  }
-});
+    if (action.type === "stop") {
+      const pref = parseCancelSubagentsPref(localStorage.getItem(CANCEL_SUBAGENTS_PREF_KEY));
+      stopTurn(pref !== "always_continue");
+      return;
+    }
+    if (action.type === "recancel") {
+      notifySessionCancel(true);
+      return;
+    }
+    if (action.type === "arm-clear") {
+      lastEscArm = { kind: "clear", at: Date.now() };
+      return;
+    }
+    if (action.type === "clear") {
+      lastEscArm = null;
+      promptEl.value = "";
+      hidePopovers();
+      return;
+    }
+    if (action.type === "arm-rewind") {
+      lastEscArm = { kind: "rewind", at: Date.now() };
+      return;
+    }
+    if (action.type === "rewind") {
+      lastEscArm = null;
+      const entry = currentEntry();
+      if (entry) void rewindSession(entry);
+    }
+  },
+  true,
+);
 
 async function fetchGhost() {
   if (!sessionId || promptEl.value.trim()) return;

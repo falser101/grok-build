@@ -75,6 +75,7 @@ test("context usage and slash args", () => {
   assert.equal(formatSlashSubmit("find", "foo"), "/find foo");
   assert.equal(formatSlashSubmit("jump", "  "), "/jump");
   assert.ok(APP_SHORTCUTS.some((s) => s.keys === "Ctrl+P"));
+  assert.ok(!APP_SHORTCUTS.some((s) => s.keys === "Ctrl+X"));
   assert.equal(contextChipText(parseContextUsage({ data: { context: { usedPercent: 42 } } })), "上下文 42%");
   assert.equal(contextChipText(parseContextUsage({})), "上下文 —%");
   const grouped = groupPaletteItems(
@@ -84,8 +85,10 @@ test("context usage and slash args", () => {
     }),
   );
   assert.deepEqual(grouped.map((g) => g.label), ["快捷键", "slash", "skill"]);
-  assert.equal(HELP_SHORTCUTS.length, 7);
-  assert.ok(HELP_SHORTCUTS.some((s) => s.keys === "Ctrl+." && s.title === "本页"));
+  assert.deepEqual(HELP_SHORTCUTS, APP_SHORTCUTS);
+  assert.ok(HELP_SHORTCUTS.some((s) => s.keys === "Ctrl+." && s.run === "shortcuts"));
+  assert.ok(HELP_SHORTCUTS.some((s) => s.keys === "?"));
+  assert.ok(!HELP_SHORTCUTS.some((s) => s.keys === "Ctrl+X"));
 });
 
 
@@ -96,6 +99,7 @@ test("global hotkeys do not invent commands", () => {
   assert.equal(mapGlobalHotkey("?", none, false), "shortcuts");
   assert.equal(mapGlobalHotkey("?", none, true), null);
   assert.equal(mapGlobalHotkey(".", { ...none, ctrl: true }, false), "shortcuts");
+  assert.equal(mapGlobalHotkey("x", { ...none, ctrl: true }, false), null);
   assert.equal(mapGlobalHotkey("m", { ...none, ctrl: true }, false), "model");
   assert.equal(mapGlobalHotkey("m", { ...none, ctrl: true }, true), null);
   assert.equal(mapGlobalHotkey(";", { ...none, ctrl: true }, true), "queue");

@@ -8,10 +8,10 @@ Web **不要** 1:1 复制终端改键矩阵。语义对齐 + 屏幕按钮。下�
 | K-02 | Vim 滚动 | `vim_mode`：j/k、H/L turn、J/K 回复、g/G、h/l 折、e/E、y/Y、o/O、r、x、i 插入 | 可选 keymap 包。默认关 | 否（不做）：不提供滚动 vim |
 | K-03 | 字母抢焦点 | simple 下滚动焦点按字母 → 聚焦 prompt 并输入 | 底部输入常驻，不需要 | 否（N/A） |
 | K-04 | Tab 焦点 | 见 I-05、B- | 浏览器 Tab 走焦点环；卡打开时 trap | 是：浏览器 Tab；权限卡收起后 Tab 回来 |
-| K-05 | Esc 阶梯 | 文档 03：overlay 先吃；再 cancel/clear/rewind。全屏 vim 运行中 Esc **不**取消。Minimal/非 vim Esc 立即取消并留草稿。取消中 Esc 重发 cancel。idle 非空双 Esc 清。idle 空+有消息双 Esc rewind。grace 1s。 | 实现同一状态机，快捷键可用 Esc 或按钮 | 部分：Esc 关浮层 / 收权限卡。**备注：完整双 Esc rewind 阶梯 {NOTE}。** |
+| K-05 | Esc 阶梯 | 文档 03：overlay 先吃；再 cancel/clear/rewind。全屏 vim 运行中 Esc **不**取消。Minimal/非 vim Esc 立即取消并留草稿。取消中 Esc 重发 cancel。idle 非空双 Esc 清。idle 空+有消息双 Esc rewind。grace 1s。 | 实现同一状态机，快捷键可用 Esc 或按钮 | 是：Esc 不回 Dashboard。浮层先关。运行中 Stop 留草稿。idle 非空双 Esc 清输入（提示贴输入条「再按 Esc 清空 · 1 秒」）。idle 空+有消息双 Esc 撤回上一轮（「再按 Esc 撤回 · 1 秒」，确认框，不是回退列表）。 |
 | K-06 | Ctrl+C | 非空先清草稿；空取消；取消中再按趋向退出 | Stop 按钮 ≠ 清输入 | 是：Stop 保留草稿；Ctrl+K 清输入 |
-| K-07 | Ctrl+P palette | | ⌘/Ctrl+K 更符合 Web | 是：Ctrl+P 命令面板 |
-| K-08 | Ctrl+M | prompt：multiline；否则模型 picker | 拆两个按钮 | 是：模型在输入框；Ctrl+M 打开模型 |
+| K-07 | Ctrl+P palette | | ⌘/Ctrl+K 更符合 Web | 是：Ctrl+P 命令面板；? 速查七条第一行是 Ctrl+P 面板 |
+| K-08 | Ctrl+M | prompt：multiline；否则模型 picker | 拆两个按钮 | 是：模型在输入框；composer 聚焦时 Ctrl+M 打开和点模型芯片同一层 |
 | K-09 | Ctrl+O YOLO | | 按钮 | 是：分段 YOLO / Ctrl+O 在权限卡 |
 | K-10 | Ctrl+S picker | | 会话列表路由 | 是：侧栏会话列表 |
 | K-11 | Ctrl+; 队列 | macOS VS Code：Ctrl+4 | 侧栏 | 是：Ctrl+; 队列 |
@@ -20,7 +20,7 @@ Web **不要** 1:1 复制终端改键矩阵。语义对齐 + 屏幕按钮。下�
 | K-14 | Ctrl+T todos | | 侧栏 | 否。**备注：Ctrl+T todos 待讨论后再做。** |
 | K-15 | Ctrl+G | 全屏 tasks；Minimal 外编 | 任务页 | 否。**备注：Ctrl+G 任务页 待讨论后再做。** |
 | K-16 | Ctrl+L | 非 VS Code：扩展模态；VS Code 家族：interject | 永不绑 Ctrl+L（浏览器焦点地址栏）。按钮 | 是：不绑 Ctrl+L；插入走芯片 |
-| K-17 | Ctrl+. / Ctrl+X 速查 | 无 KKP 用 Ctrl+X | `?` | 是：? / Ctrl+. |
+| K-17 | Ctrl+. / Ctrl+X 速查 | 无 KKP 用 Ctrl+X | `?` | 是：? / Ctrl+. 七条（Ctrl+P 面板、Ctrl+Enter 立即发送、Shift+Tab 模式、Ctrl+; 队列、Ctrl+, 设置、? / Ctrl+. 速查、Ctrl+\\ 总览）；Esc 只在底「Esc 关闭」 |
 | K-18 | F2 设置 | Ctrl+, / Cmd+, | `g ,` 或齿轮 | 是：齿轮 / Ctrl+, |
 | K-19 | Ctrl+N 新会话 | 双击 1s | 按钮 | 是：新会话按钮（不要求双击） |
 | K-20 | Ctrl+\ Dashboard | | 路由 | 是：`/dashboard` 路由 |

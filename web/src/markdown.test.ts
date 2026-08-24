@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renderMarkdown } from "./markdown.ts";
+import { renderMarkdown, renderMarkdownStream, streamMarkdownHtml } from "./markdown.ts";
 
 test("escapes raw HTML", () => {
   const html = renderMarkdown("<script>alert(1)</script>");
@@ -82,4 +82,110 @@ test("ordered lists stay one ol so numbers increment", () => {
 
   const fromThree = renderMarkdown("3. third\n4. fourth");
   assert.match(fromThree, /<ol start="3">/);
+});
+
+function replayStream(chunks: string[]) {
+  let acc = "";
+  let from = 0;
+  let frozen = "";
+  let last: ReturnType<typeof renderMarkdownStream> | null = null;
+  for (const chunk of chunks) {
+    acc += chunk;
+    const slice = renderMarkdownStream(acc.slice(from));
+    frozen += slice.closed.map((b) => b.html).join("");
+    from += slice.frozenEnd;
+    last = slice;
+    const full = renderMarkdownStream(acc);
+    assert.equal(frozen, full.closed.map((b) => b.html).join(""));
+    assert.deepEqual(slice.live, full.live);
+    if (full.live?.kind !== "fence") {
+      assert.equal(frozen + (full.live?.html ?? ""), renderMarkdown(acc));
+    }
+    assert.equal(streamMarkdownHtml(acc), renderMarkdown(acc));
+  }
+  return { acc, from, frozen, last };
+}
+
+test("stream html matches full render for complete docs", () => {
+  const src = [
+    "# Title",
+    "",
+    "hello **bold** and `code`",
+    "",
+    "```js",
+    "const x = 1;",
+    "```",
+    "",
+    "| a | b |",
+    "| --- | --- |",
+    "| 1 | 2 |",
+    "",
+    "- [x] done",
+    "- [ ] todo",
+    "",
+    "> quoted",
+    "",
+    "[site](https://example.com)",
+  ].join("\n");
+  assert.equal(streamMarkdownHtml(src), renderMarkdown(src));
+});
+
+test("last block stays live; previous blocks freeze", () => {
+  const slice = renderMarkdownStream("# Title\n\nHello");
+  assert.equal(slice.closed.length, 1);
+  assert.match(slice.closed[0]!.html, /<h1>Title<\/h1>/);
+  assert.equal(slice.live?.kind, "html");
+  if (slice.live?.kind === "html") assert.match(slice.live.html, /Hello/);
+  assert.ok(slice.frozenEnd > 0);
+  assert.equal(slice.closed[0]!.end, slice.frozenEnd);
+});
+
+test("unclosed fence is live text, not a frozen highlighted block", () => {
+  const slice = renderMarkdownStream("```js\nconst x = 1");
+  assert.equal(slice.closed.length, 0);
+  assert.equal(slice.frozenEnd, 0);
+  assert.deepEqual(slice.live, { kind: "fence", lang: "js", code: "const x = 1" });
+});
+
+test("closed fence freezes once a later block starts", () => {
+  const slice = renderMarkdownStream("```js\nconst x = 1;\n```\n\nHi");
+  assert.ok(slice.closed.some((b) => b.html.includes("language-js") && b.html.includes("tok-k")));
+  assert.equal(slice.live?.kind, "html");
+  if (slice.live?.kind === "html") assert.match(slice.live.html, /Hi/);
+});
+
+test("chunked replay freezes prefix and matches full render", () => {
+  const { acc, from, last } = replayStream([
+    "# Title\n\n",
+    "Hello **w",
+    "orld**.\n\n",
+    "```js\ncon",
+    "st x = 1;\n",
+    "```\n\n",
+    "Done.",
+  ]);
+  assert.equal(renderMarkdownStream(acc).closed.length, 3);
+  assert.ok(from > 0);
+  assert.equal(last?.live?.kind, "html");
+  assert.equal(streamMarkdownHtml(acc), renderMarkdown(acc));
+});
+
+test("growing first paragraph stays live until a later block arrives", () => {
+  const a = renderMarkdownStream("Hello");
+  assert.equal(a.closed.length, 0);
+  assert.equal(a.frozenEnd, 0);
+  const b = renderMarkdownStream("Hello world");
+  assert.equal(b.closed.length, 0);
+  const c = renderMarkdownStream("Hello world\n\n# Next");
+  assert.equal(c.closed.length, 1);
+  assert.match(c.closed[0]!.html, /Hello world/);
+  assert.equal(c.live?.kind, "html");
+  if (c.live?.kind === "html") assert.match(c.live.html, /Next/);
+});
+
+test("blank line after a paragraph freezes it", () => {
+  const slice = renderMarkdownStream("Hello\n\n");
+  assert.equal(slice.closed.length, 1);
+  assert.equal(slice.live, null);
+  assert.equal(streamMarkdownHtml("Hello\n\n"), renderMarkdown("Hello\n\n"));
 });

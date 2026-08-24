@@ -5,7 +5,7 @@ TUI 把 ACP `session/update` + `x.ai/session_notification` 收成 `RenderBlock`�
 | ID | 功能点 | TUI | Web 怎么做 | Web 已实现 |
 |---|---|---|---|---|
 | C-01 | 用户气泡 | `UserPromptBlock`；`[scrollback.blocks.prompt]` vpad/bg/prefix/min_lines。sticky header 可钉。 | 右/左气泡。发送时可乐观插入，以 server echo/`eventId` 去重。 | 是 |
-| C-02 | 助手 Markdown | `AgentMessageBlock` + 流式 markdown（`xai-grok-markdown`）。heading/code/table/task/link。 | `react-markdown` 等流式追加。代码块高亮用 highlight.js/shiki，对齐主题。 | 部分：助手/思考按 Markdown 排版（标题/列表/代码/表格/链接）；无 shiki |
+| C-02 | 助手 Markdown | `AgentMessageBlock` + 流式 markdown（`xai-grok-markdown`）。heading/code/table/task/link。 | `react-markdown` 等流式追加。代码块高亮用 highlight.js/shiki，对齐主题。 | 部分：助手/思考按 Markdown 排版；流式冻住已闭合块、只重绘 live 尾（未闭合 fence 先纯文本，闭合后高亮一次）；无 shiki |
 | C-03 | Thinking 块 | `ThinkingBlock`；`show_thinking_blocks`；accent 动画；truncated_lines；`Ctrl+E` 全开合。header「Thinking...」。 | 可折叠 `<details>`。流式时自动展开，结束可折。关设置则不渲染。 | 是 |
 | C-04 | 工具块分型 | 见 [11-tools-blocks.md](11-tools-blocks.md)。`group_tool_verbs` 把连续 read/search/list/子 agent/已完成 thinking 收成一行。 | 同：连续只读工具折叠为「读了 N 个文件」。 | 部分：连续 read/search/list/fetch/websearch/memory 收成一行；edit/exec/mcp 各成一块；展开后按 kind 画 path/hits/`$`/MCP 徽章 |
 | C-05 | Edit diff | `EditToolCallBlock`；语法高亮 diff；可选 dual line numbers；hunk `…`；`collapsed_edit_blocks` 时 +N/-M 一行，同文件合并。 | Monaco/CodeMirror 只读 diff 或 HTML table。折叠默认跟设置。 | 部分：每条 edit 单独展开 HTML hunk diff（`… N 行未改` + +N/−M）；无 Monaco / 同文件合并 |

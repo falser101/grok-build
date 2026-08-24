@@ -151,6 +151,26 @@ export function shouldEnqueue(turnRunning: boolean, sendNow: boolean): boolean {
   return turnRunning && !sendNow;
 }
 
+export type ComposerSubmitIntent = "send" | "queue" | "send-now" | "drain-head" | "noop";
+
+/** TUI: turn 中 Enter 入队；Ctrl+Enter 立即发送（可空发队首）。 */
+export function composerSubmitIntent(input: {
+  hasDraft: boolean;
+  turnRunning: boolean;
+  sendNow: boolean;
+  hasQueue: boolean;
+  emptyRepeat: boolean;
+}): ComposerSubmitIntent {
+  if (!input.hasDraft) {
+    if (input.sendNow && input.hasQueue) return "drain-head";
+    if (!input.sendNow && input.emptyRepeat && input.hasQueue) return "drain-head";
+    return "noop";
+  }
+  if (input.sendNow) return "send-now";
+  if (input.turnRunning) return "queue";
+  return "send";
+}
+
 export function drainQueueHead(items: QueueItem[]): {
   next: QueueItem | null;
   rest: QueueItem[];
@@ -335,12 +355,59 @@ export function parseFuzzyStatus(params: Json): { path: string; score: number }[
   return out;
 }
 
+/** TUI @-search walks the session cwd, not the agent process root. */
+export function buildFuzzyOpenParams(input: {
+  sessionId: string | null;
+  cwd: string;
+  hidden?: boolean;
+}): { [k: string]: Json } {
+  const params: { [k: string]: Json } = {
+    hidden: Boolean(input.hidden),
+  };
+  if (input.sessionId) params.sessionId = input.sessionId;
+  if (input.cwd.trim()) params.cwd = input.cwd.trim();
+  return params;
+}
+
+/** Keep paths inside `root`; strip that prefix so the menu matches TUI. */
+export function relativizeFuzzyPath(path: string, root: string): string | null {
+  const p = path.replace(/^\.\//, "");
+  const r = root.trim().replace(/\/+$/, "");
+  if (!r) return p;
+  if (p === r) return "";
+  const prefix = `${r}/`;
+  if (p.startsWith(prefix)) return p.slice(prefix.length);
+  if (!p.startsWith("/")) return p;
+  return null;
+}
+
+export function scopeFuzzyMatches(
+  matches: { path: string; score: number }[],
+  root: string,
+): { path: string; score: number }[] {
+  const out: { path: string; score: number }[] = [];
+  for (const row of matches) {
+    const rel = relativizeFuzzyPath(row.path, root);
+    if (rel == null || rel === "") continue;
+    out.push({ path: rel, score: row.score });
+  }
+  return out;
+}
+
 export function isQueuedSlash(text: string): boolean {
   return parseLocalSlash(text) !== null || /^\/[a-z]/i.test(text.trim());
 }
 
 export function composerIsFilled(text: string, images: { length: number }): boolean {
   return Boolean(text.trim()) || images.length > 0;
+}
+
+/** Matches `.composer textarea { max-height: 12rem }` at `html { font-size: 15px }`. */
+export const COMPOSER_TEXTAREA_MAX_PX = 180;
+
+/** Grow with wrapped lines up to the CSS cap; callers then let the textarea scroll. */
+export function nextComposerTextareaHeight(scrollHeight: number, maxPx = COMPOSER_TEXTAREA_MAX_PX): number {
+  return Math.min(Math.max(0, scrollHeight), maxPx);
 }
 
 export function permissionChipLabel(mode: string): string {

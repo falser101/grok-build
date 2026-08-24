@@ -68,6 +68,8 @@ test("buildInitializeParams identifies grok-web and never advertises fs/terminal
     _meta?: { "x.ai/folderTrust"?: { interactive?: boolean } };
   };
   assert.equal(capsMeta._meta?.["x.ai/folderTrust"]?.interactive, true);
+  const statusLineMeta = rec.clientCapabilities as { _meta?: { "x.ai/statusLine"?: boolean } };
+  assert.equal(statusLineMeta._meta?.["x.ai/statusLine"], true);
   assert.equal(rec._meta.clientType, CLIENT_TYPE);
   assert.equal(rec._meta.clientIdentifier, CLIENT_IDENTIFIER);
   assert.equal(rec._meta.clientVersion, CLIENT_VERSION);

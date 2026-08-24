@@ -63,6 +63,14 @@ test("hint focus and turn status", () => {
 test("context usage and slash args", () => {
   assert.equal(parseContextUsage({ data: { context: { usedPercent: 42 } } }).label, "42%");
   assert.equal(parseContextUsage({ context: { tokens: 1500, contextWindow: 3000 } }).label, "50%");
+  assert.equal(parseContextUsage({ context: { used: 200, total: 800, usagePct: 25 } }).label, "25%");
+  assert.equal(
+    parseContextUsage({
+      sessionUpdate: "session_status",
+      context_window: { used_percentage: 8, context_tokens: 1000, context_window_size: 128000 },
+    }).label,
+    "8%",
+  );
   assert.equal(parseContextUsage({}).label, "—%");
   assert.equal(formatSlashSubmit("find", "foo"), "/find foo");
   assert.equal(formatSlashSubmit("jump", "  "), "/jump");

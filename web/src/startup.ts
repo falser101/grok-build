@@ -94,6 +94,10 @@ export type SessionListEntry = {
   gitRootDir: string | null;
   sourceWorkspaceDir: string | null;
   repoName: string | null;
+  numMessages?: number;
+  firstPrompt?: string | null;
+  createdAt?: string | null;
+  hidden?: boolean;
 };
 
 export type FolderTrustOutcome = "trust" | "reject";
@@ -102,6 +106,44 @@ export function asRecord(value: Json): { [k: string]: Json } | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as { [k: string]: Json })
     : null;
+}
+
+/** ACP `SessionNotification.sessionId` (also snake_case). */
+export function notificationSessionId(params: Json): string | null {
+  const rec = asRecord(params);
+  if (!rec) return null;
+  if (typeof rec.sessionId === "string" && rec.sessionId) return rec.sessionId;
+  if (typeof rec.session_id === "string" && rec.session_id) return rec.session_id;
+  return null;
+}
+
+/** Updates for another session must not paint the visible timeline. */
+export function timelineEventIsForeign(
+  eventSessionId: string | null,
+  currentSessionId: string | null,
+): boolean {
+  return Boolean(eventSessionId && currentSessionId && eventSessionId !== currentSessionId);
+}
+
+const STREAM_METHODS = new Set([
+  "session/update",
+  "x.ai/session/update",
+  "x.ai/session_notification",
+  "x.ai/session/prompt_complete",
+]);
+
+/**
+ * Front session owns the conversation pane. A background session may only
+ * update sidebar/dashboard status — never the visible timeline.
+ */
+export function isFrontSessionStream(input: {
+  method: string;
+  eventSessionId: string | null;
+  currentSessionId: string | null;
+}): boolean {
+  if (!STREAM_METHODS.has(input.method)) return true;
+  if (!input.eventSessionId || !input.currentSessionId) return true;
+  return input.eventSessionId === input.currentSessionId;
 }
 
 export function authMethodKind(id: string): AuthMethodKind {
@@ -524,24 +566,31 @@ export function parseSessionListPage(payload: Json): {
         (typeof sessionMeta?.kind === "string" && sessionMeta.kind) ||
         (typeof r?.sessionKind === "string" && r.sessionKind) ||
         "build";
+      const rawSummary =
+        (typeof r?.summary === "string" && r.summary) ||
+        (typeof r?.title === "string" && r.title) ||
+        "";
+      const numRaw = r?.numMessages ?? r?.num_messages;
       sessions.push({
         sessionId,
-        summary:
-          (typeof r?.summary === "string" && r.summary) ||
-          (typeof r?.title === "string" && r.title) ||
-          sessionId,
+        // TUI picker drops empty-summary Build rows. Do not fill UUID here.
+        summary: rawSummary,
         cwd: typeof r?.cwd === "string" && r.cwd ? r.cwd : null,
         updatedAt:
           (typeof r?.updatedAt === "string" && r.updatedAt) ||
           (typeof r?.updated_at === "string" && r.updated_at) ||
           (typeof r?.lastActiveAt === "string" && r.lastActiveAt) ||
+          (typeof r?.last_active_at === "string" && r.last_active_at) ||
           null,
         source: typeof r?.source === "string" ? r.source : null,
         lastTurnSummary:
           (typeof r?.lastTurnSummary === "string" && r.lastTurnSummary) ||
           (typeof r?.last_turn_summary === "string" && r.last_turn_summary) ||
           null,
-        sessionKind: typeof r?.sessionKind === "string" ? r.sessionKind : null,
+        sessionKind:
+          (typeof r?.sessionKind === "string" && r.sessionKind) ||
+          (typeof r?.session_kind === "string" && r.session_kind) ||
+          null,
         adminKind: kindRaw === "chat" ? "chat" : "build",
         worktreeLabel:
           (typeof r?.worktreeLabel === "string" && r.worktreeLabel) ||
@@ -559,6 +608,16 @@ export function parseSessionListPage(payload: Json): {
           (typeof r?.repoName === "string" && r.repoName) ||
           (typeof r?.repo_name === "string" && r.repo_name) ||
           null,
+        numMessages: typeof numRaw === "number" && Number.isFinite(numRaw) ? numRaw : 0,
+        firstPrompt:
+          (typeof r?.firstPrompt === "string" && r.firstPrompt) ||
+          (typeof r?.first_prompt === "string" && r.first_prompt) ||
+          null,
+        createdAt:
+          (typeof r?.createdAt === "string" && r.createdAt) ||
+          (typeof r?.created_at === "string" && r.created_at) ||
+          null,
+        hidden: r?.hidden === true,
       });
     }
   }

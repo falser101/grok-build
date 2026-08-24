@@ -6,7 +6,7 @@ import {
   isDoneToolStatus,
   toolStatusLabel,
 } from "./tool_blocks.ts";
-import { renderMarkdown } from "./markdown.ts";
+import { applyMarkdownStream } from "./markdown.ts";
 import { relativeTime } from "./highlight.ts";
 import { stripImagePlaceholders } from "./protocol.ts";
 
@@ -106,7 +106,7 @@ function patchStreamingBody(el: HTMLElement, item: TimelineItem): boolean {
   if (!body) return false;
   if (item.kind === "think") {
     (el as HTMLDetailsElement).open = item.open !== false;
-    body.innerHTML = renderMarkdown(item.text);
+    applyMarkdownStream(body, item.text);
     return true;
   }
   if (item.kind === "agent" && el.dataset.raw === "1") {
@@ -114,7 +114,7 @@ function patchStreamingBody(el: HTMLElement, item: TimelineItem): boolean {
     pre.textContent = item.raw;
     return true;
   }
-  body.innerHTML = renderMarkdown(item.text);
+  applyMarkdownStream(body, item.text);
   return true;
 }
 
@@ -132,7 +132,7 @@ function fill(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
     sum.textContent = "Thinking";
     const body = document.createElement("div");
     body.className = "body";
-    body.innerHTML = renderMarkdown(item.text);
+    applyMarkdownStream(body, item.text);
     details.append(sum, body);
     details.open = item.open !== false;
     details.addEventListener("toggle", () => {
@@ -181,7 +181,7 @@ function fill(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
     pre.textContent = item.raw;
     body.append(pre);
   } else if (item.kind === "agent" || item.kind === "btw") {
-    body.innerHTML = renderMarkdown(item.text);
+    applyMarkdownStream(body, item.text);
   } else if (item.kind === "user") {
     const visible = stripImagePlaceholders(item.text || item.raw);
     body.textContent = visible;
@@ -324,7 +324,7 @@ function fillTool(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
   const body = document.createElement("div");
   body.className = "body";
   body.innerHTML = item.html;
-  body.hidden = !item.open;
+  body.hidden = !item.open || !item.html.trim();
   bindToolBody(body, item, handlers);
   if (item.hook) {
     const foot = document.createElement("div");

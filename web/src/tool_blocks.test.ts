@@ -31,6 +31,19 @@ test("toolSummary uses chinese nouns per family", () => {
   assert.match(toolSummary("read", 2, "a.ts"), /读了 2/);
   assert.match(toolSummary("search", 2, "TODO"), /搜索了 2/);
   assert.match(toolSummary("exec", 1, "Execute `ls`"), /运行 ls/);
+  assert.equal(toolSummary("other", 1, "tool"), "工具");
+});
+
+test("generic tool html does not echo title into a big output card", () => {
+  const html = formatToolHtml("tool", "tool", { kind: "tool", title: "tool" });
+  assert.equal(html.includes("tool-output"), false);
+  const named = formatToolHtml("other", "saved image", {
+    kind: "other",
+    title: "image_gen",
+    name: "image_gen",
+  });
+  assert.match(named, /tool-output/);
+  assert.match(named, /saved image/);
 });
 
 test("truncateLines keeps head and tail", () => {

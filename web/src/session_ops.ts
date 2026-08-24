@@ -198,8 +198,11 @@ export function formatSessionInfo(payload: Json): string {
     `turns: ${data.turns ?? ""}`,
   ];
   if (ctx) {
-    const used = ctx.usedPercent ?? ctx.used_percent ?? ctx.tokens;
-    if (used !== undefined) lines.push(`context: ${String(used)}`);
+    const used = ctx.usagePct ?? ctx.usage_pct ?? ctx.usedPercent ?? ctx.used_percent ?? ctx.used ?? ctx.tokens;
+    const total = ctx.total ?? ctx.contextWindow ?? ctx.context_window;
+    if (used !== undefined) {
+      lines.push(total !== undefined ? `context: ${String(used)} / ${String(total)}` : `context: ${String(used)}`);
+    }
   }
   return lines.filter((l) => !l.endsWith(": ")).join("\n");
 }
@@ -353,4 +356,107 @@ export function groupSessionsByWorkspace<T extends WorkspaceSession>(
     return a.label.localeCompare(b.label);
   });
   return groups;
+}
+
+/** TUI `FetchSessionList` page size — picker loads at most this many per cwd. */
+export const PICKER_GROUP_LIMIT = 30;
+
+/** TUI `parse_session_picker_entries`: drop Build rows older than this. */
+export const PICKER_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+function isChatPickerRow(entry: SessionListEntry): boolean {
+  return entry.adminKind === "chat" || entry.source === "conversation";
+}
+
+/** TUI default source filter is Grok: Claude/Codex/Cursor stay off the list. */
+export function isForeignPickerSource(source: string | null | undefined): boolean {
+  const s = (source ?? "").trim().toLowerCase();
+  return s === "claude" || s === "codex" || s === "cursor";
+}
+
+function isHiddenPickerSession(entry: SessionListEntry): boolean {
+  if (entry.hidden) return true;
+  const kind = (entry.sessionKind ?? "").trim().toLowerCase();
+  return kind.startsWith("subagent");
+}
+
+function parsePickerTime(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const n = Date.parse(raw);
+  if (Number.isFinite(n)) return n;
+  const asNum = Number(raw);
+  if (!Number.isFinite(asNum)) return null;
+  return asNum < 1e12 ? asNum * 1000 : asNum;
+}
+
+/**
+ * Display title the TUI picker would use before dropping empty Build rows.
+ * `firstPrompt` is the wire fallback when `summary` is blank.
+ */
+export function pickerDisplayTitle(entry: SessionListEntry): string {
+  const summary = entry.summary.trim();
+  if (summary && summary !== entry.sessionId) return summary;
+  const fp = (entry.firstPrompt ?? "").trim();
+  if (!fp) return "";
+  const line = fp.split(/\r?\n/).find((l) => l.trim());
+  return (line ?? "").trim();
+}
+
+/**
+ * Same keep/drop rules as TUI `parse_session_picker_entries` + default Grok
+ * source filter. Agent already hides `session_kind` subagent rows; this is
+ * the client-side match so Web counts equal TUI in one working directory.
+ */
+export function pickerSessionVisible(entry: SessionListEntry, now = Date.now()): boolean {
+  if (isHiddenPickerSession(entry)) return false;
+  if (isForeignPickerSource(entry.source)) return false;
+  const chat = isChatPickerRow(entry);
+  const updated = parsePickerTime(entry.updatedAt);
+  if (!chat) {
+    if (updated == null) return false;
+    if (now - updated > PICKER_MAX_AGE_MS) return false;
+  }
+  const title = pickerDisplayTitle(entry);
+  if (title) return true;
+  return chat;
+}
+
+/**
+ * Filter a global `x.ai/session/list` into the rows TUI `/resume` would show,
+ * grouped later by workspace. Each workspace is capped at
+ * [`PICKER_GROUP_LIMIT`] (TUI fetches 30 for that cwd). `keepIds` stay even
+ * when they would otherwise be dropped (the open session).
+ */
+export function selectVisiblePickerSessions(
+  entries: SessionListEntry[],
+  opts?: { now?: number; keepIds?: Iterable<string> },
+): SessionListEntry[] {
+  const now = opts?.now ?? Date.now();
+  const keep = new Set(opts?.keepIds ?? []);
+  const visible = entries.filter((e) => keep.has(e.sessionId) || pickerSessionVisible(e, now));
+  const groups = new Map<string, SessionListEntry[]>();
+  const order: string[] = [];
+  for (const entry of visible) {
+    const key = workspaceGroupKey(entry);
+    let rows = groups.get(key);
+    if (!rows) {
+      rows = [];
+      groups.set(key, rows);
+      order.push(key);
+    }
+    rows.push(entry);
+  }
+  const out: SessionListEntry[] = [];
+  for (const key of order) {
+    const rows = groups.get(key);
+    if (!rows) continue;
+    rows.sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+    const top = rows.slice(0, PICKER_GROUP_LIMIT);
+    const topIds = new Set(top.map((e) => e.sessionId));
+    for (const entry of rows) {
+      if (keep.has(entry.sessionId) && !topIds.has(entry.sessionId)) top.push(entry);
+    }
+    out.push(...top);
+  }
+  return out;
 }

@@ -111,17 +111,20 @@ export class AcpClient {
   request(method: string, params: Json, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<Json> {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      const timer = window.setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error(`ACP timeout: ${method}`));
-      }, timeoutMs);
+      const timer =
+        timeoutMs > 0
+          ? window.setTimeout(() => {
+              this.pending.delete(id);
+              reject(new Error(`ACP timeout: ${method}`));
+            }, timeoutMs)
+          : 0;
       this.pending.set(id, {
         resolve: (value) => {
-          window.clearTimeout(timer);
+          if (timer) window.clearTimeout(timer);
           resolve(value);
         },
         reject: (err) => {
-          window.clearTimeout(timer);
+          if (timer) window.clearTimeout(timer);
           reject(err);
         },
       });

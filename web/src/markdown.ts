@@ -156,15 +156,50 @@ function renderTable(header: string, rows: string[]): string {
     .join("")}</tr></thead><tbody>${body.join("")}</tbody></table></div>`;
 }
 
-export function renderMarkdown(src: string): string {
-  const lines = src.replace(/\r\n/g, "\n").split("\n");
-  const html: string[] = [];
+function fenceHtml(lang: string, code: string): string {
+  if (lang === "mermaid") {
+    return `<pre class="mermaid-block">${escapeHtml(code)}</pre>`;
+  }
+  return `<pre><code${lang ? ` class="language-${lang}"` : ""}>${highlightCode(code, lang)}</code></pre>`;
+}
+
+type ParsedFence = { lang: string; code: string; closed: boolean };
+
+type ParsedBlock = {
+  html: string;
+  end: number;
+  fence?: ParsedFence;
+};
+
+function lineStarts(lines: string[]): number[] {
+  const offs: number[] = [];
+  let o = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    offs.push(o);
+    o += (lines[i] ?? "").length;
+    if (i < lines.length - 1) o += 1;
+  }
+  return offs;
+}
+
+function parseMarkdown(src: string): ParsedBlock[] {
+  const lines = src.split("\n");
+  const offs = lineStarts(lines);
+  const at = (lineIndex: number) => (lineIndex >= offs.length ? src.length : offs[lineIndex]!);
+  const blocks: ParsedBlock[] = [];
   let i = 0;
   let para: string[] = [];
+
+  const push = (html: string, end: number, fence?: ParsedFence) => {
+    if (!html && !fence) return;
+    blocks.push({ html, end, fence });
+  };
+
   const flushPara = () => {
     if (!para.length) return;
-    html.push(`<p>${inline(para.join(" "))}</p>`);
+    const html = `<p>${inline(para.join(" "))}</p>`;
     para = [];
+    push(html, at(i));
   };
 
   while (i < lines.length) {
@@ -178,15 +213,10 @@ export function renderMarkdown(src: string): string {
         buf.push(lines[i] ?? "");
         i += 1;
       }
-      i += 1;
+      const closed = i < lines.length && (lines[i] ?? "").startsWith("```");
+      if (closed) i += 1;
       const code = buf.join("\n");
-      if (lang === "mermaid") {
-        html.push(`<pre class="mermaid-block">${escapeHtml(code)}</pre>`);
-      } else {
-        html.push(
-          `<pre><code${lang ? ` class="language-${lang}"` : ""}>${highlightCode(code, lang)}</code></pre>`,
-        );
-      }
+      push(fenceHtml(lang, code), at(i), { lang, code, closed });
       continue;
     }
     if (
@@ -202,15 +232,15 @@ export function renderMarkdown(src: string): string {
         rows.push(lines[i] ?? "");
         i += 1;
       }
-      html.push(renderTable(header, rows));
+      push(renderTable(header, rows), at(i));
       continue;
     }
     const heading = /^(#{1,6})\s+(.+)$/.exec(line);
     if (heading) {
       flushPara();
       const n = heading[1]!.length;
-      html.push(`<h${n}>${inline(heading[2]!)}</h${n}>`);
       i += 1;
+      push(`<h${n}>${inline(heading[2]!)}</h${n}>`, at(i));
       continue;
     }
     if (/^>\s?/.test(line)) {
@@ -220,22 +250,22 @@ export function renderMarkdown(src: string): string {
         quote.push((lines[i] ?? "").replace(/^>\s?/, ""));
         i += 1;
       }
-      html.push(`<blockquote>${renderMarkdown(quote.join("\n"))}</blockquote>`);
+      push(`<blockquote>${renderMarkdown(quote.join("\n"))}</blockquote>`, at(i));
       continue;
     }
     const hr = /^\s*([-*_])\1{2,}\s*$/.test(line);
     if (hr) {
       flushPara();
-      html.push("<hr />");
       i += 1;
+      push("<hr />", at(i));
       continue;
     }
     const marker = listMarker(line);
     if (marker) {
       flushPara();
       const list = consumeList(lines, i, marker);
-      html.push(list.html);
       i = list.next;
+      push(list.html, at(i));
       continue;
     }
     if (!line.trim()) {
@@ -247,5 +277,193 @@ export function renderMarkdown(src: string): string {
     i += 1;
   }
   flushPara();
-  return html.join("") || `<p>${inline(src)}</p>`;
+  return blocks;
+}
+
+export type MdClosedBlock = {
+  html: string;
+  end: number;
+};
+
+export type MdStreamLive =
+  | { kind: "html"; html: string }
+  | { kind: "fence"; lang: string; code: string };
+
+export type MdStreamSlice = {
+  closed: MdClosedBlock[];
+  live: MdStreamLive | null;
+  frozenEnd: number;
+};
+
+function fallbackParagraph(src: string): string {
+  return `<p>${inline(src)}</p>`;
+}
+
+function joinBlocks(blocks: ParsedBlock[]): string {
+  return blocks.map((b) => b.html).join("");
+}
+
+/** Full-document render. HTML of a complete source is unchanged vs the previous parser. */
+export function renderMarkdown(src: string): string {
+  const normalized = src.replace(/\r\n/g, "\n");
+  const html = joinBlocks(parseMarkdown(normalized));
+  return html || fallbackParagraph(src);
+}
+
+/**
+ * Split into frozen prefix blocks + live tail.
+ * The last block stays live (it may still grow). An unclosed fence is live text, not highlighted.
+ */
+export function renderMarkdownStream(src: string): MdStreamSlice {
+  const normalized = src.replace(/\r\n/g, "\n");
+  const blocks = parseMarkdown(normalized);
+  if (!blocks.length) {
+    if (!normalized) return { closed: [], live: null, frozenEnd: 0 };
+    return { closed: [], live: { kind: "html", html: fallbackParagraph(normalized) }, frozenEnd: 0 };
+  }
+  const last = blocks[blocks.length - 1]!;
+  if (last.end < normalized.length && !normalized.slice(last.end).trim()) {
+    return {
+      closed: blocks.map((b) => ({ html: b.html, end: b.end })),
+      live: null,
+      frozenEnd: last.end,
+    };
+  }
+  const closed = blocks.slice(0, -1).map((b) => ({ html: b.html, end: b.end }));
+  const frozenEnd = closed.length ? closed[closed.length - 1]!.end : 0;
+  if (last.fence && !last.fence.closed) {
+    return { closed, live: { kind: "fence", lang: last.fence.lang, code: last.fence.code }, frozenEnd };
+  }
+  return { closed, live: { kind: "html", html: last.html }, frozenEnd };
+}
+
+/** Frozen + live HTML. Same string as renderMarkdown for any source. */
+export function streamMarkdownHtml(src: string): string {
+  const slice = renderMarkdownStream(src);
+  const live =
+    slice.live == null
+      ? ""
+      : slice.live.kind === "html"
+        ? slice.live.html
+        : fenceHtml(slice.live.lang, slice.live.code);
+  return slice.closed.map((b) => b.html).join("") + live;
+}
+
+type MdDomState = {
+  frozenEnd: number;
+  stamp: string;
+  liveKey: string;
+};
+
+const mdDom = new WeakMap<HTMLElement, MdDomState>();
+
+function stampAt(src: string, end: number): string {
+  return `${end}:${src.slice(Math.max(0, end - 64), end)}`;
+}
+
+function appendText(el: HTMLElement, next: string) {
+  const prev = el.textContent ?? "";
+  if (next === prev) return;
+  if (next.startsWith(prev)) {
+    const add = next.slice(prev.length);
+    if (add) el.append(document.createTextNode(add));
+    return;
+  }
+  el.textContent = next;
+}
+
+function setLiveFence(live: HTMLElement, fence: { lang: string; code: string }) {
+  const mermaid = fence.lang === "mermaid";
+  const mark = mermaid ? "mermaid" : "code";
+  let pre = live.querySelector<HTMLElement>(":scope > pre");
+  if (live.dataset.fence !== mark || !pre) {
+    live.replaceChildren();
+    live.dataset.fence = mark;
+    pre = document.createElement("pre");
+    if (mermaid) {
+      pre.className = "mermaid-block";
+    } else {
+      const code = document.createElement("code");
+      if (fence.lang) code.className = `language-${fence.lang}`;
+      pre.append(code);
+    }
+    live.append(pre);
+  }
+  const inner = pre.querySelector<HTMLElement>(":scope > code");
+  appendText(mermaid ? pre : (inner ?? pre), fence.code);
+}
+
+function setLive(live: HTMLElement, next: MdStreamLive | null) {
+  if (next?.kind === "fence") {
+    setLiveFence(live, next);
+    live.hidden = false;
+    return;
+  }
+  if (live.dataset.fence) {
+    live.replaceChildren();
+    delete live.dataset.fence;
+  }
+  const html = next?.html ?? "";
+  live.innerHTML = html;
+  live.hidden = !html;
+}
+
+function ensureLive(body: HTMLElement): HTMLElement {
+  let live = body.querySelector(":scope > .md-live") as HTMLElement | null;
+  if (!live) {
+    live = document.createElement("div");
+    live.className = "md-live";
+    body.append(live);
+  }
+  return live;
+}
+
+function insertClosed(body: HTMLElement, html: string, live: HTMLElement) {
+  if (!html) return;
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html;
+  body.insertBefore(tpl.content, live);
+}
+
+/** Patch a bubble `.body` in place: append newly closed blocks, rewrite only `.md-live`. */
+export function applyMarkdownStream(body: HTMLElement, src: string): void {
+  const normalized = src.replace(/\r\n/g, "\n");
+  let state = mdDom.get(body);
+  if (
+    !state ||
+    state.frozenEnd > normalized.length ||
+    state.stamp !== stampAt(normalized, state.frozenEnd)
+  ) {
+    body.replaceChildren();
+    state = { frozenEnd: 0, stamp: stampAt(normalized, 0), liveKey: "" };
+    mdDom.set(body, state);
+  }
+
+  const live = ensureLive(body);
+  const tail = normalized.slice(state.frozenEnd);
+  const slice = renderMarkdownStream(tail);
+
+  if (state.frozenEnd === 0 && slice.closed.length) {
+    insertClosed(body, slice.closed.map((b) => b.html).join(""), live);
+  } else {
+    for (const block of slice.closed) insertClosed(body, block.html, live);
+  }
+
+  const nextEnd = state.frozenEnd + slice.frozenEnd;
+  state.frozenEnd = nextEnd;
+  state.stamp = stampAt(normalized, nextEnd);
+
+  const liveKey =
+    slice.live == null
+      ? ""
+      : slice.live.kind === "fence"
+        ? `fence:${slice.live.lang}:${slice.live.code.length}:${slice.live.code.slice(-32)}`
+        : `html:${slice.live.html}`;
+  if (slice.live?.kind === "fence") {
+    setLive(live, slice.live);
+    state.liveKey = liveKey;
+  } else if (liveKey !== state.liveKey) {
+    setLive(live, slice.live);
+    state.liveKey = liveKey;
+  }
 }

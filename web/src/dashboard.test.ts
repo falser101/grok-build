@@ -80,10 +80,18 @@ test("inferDashStatus uses live flags and disk inactivity", () => {
     inferDashStatus(disk, live({ currentSessionId: "live-1", backgroundIds: new Set(["old-1"]) })),
     "working",
   );
+  assert.equal(
+    inferDashStatus(current, live({ backgroundIds: new Set(["live-1"]) })),
+    "idle",
+  );
   assert.equal(inferDashStatus(current, live()), "idle");
   assert.equal(inferDashStatus(recent, live({ loadedIds: new Set(["live-1", "idle-1"]) })), "idle");
   assert.equal(inferDashStatus(recent, live()), "inactive");
   assert.equal(inferDashStatus(disk, live()), "inactive");
+  assert.equal(
+    inferDashStatus(entry({ sessionId: "need-1" }), live({ needsIds: new Set(["need-1"]) })),
+    "needs",
+  );
   assert.equal(inferDashStatus(entry({ sessionId: "d", sessionKind: "completed" }), live()), "completed");
   assert.equal(inferDashStatus(entry({ sessionId: "f", sessionKind: "failed" }), live()), "failed");
 });

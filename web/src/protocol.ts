@@ -50,6 +50,7 @@ export function buildInitializeParams(version = CLIENT_VERSION): Json {
       terminal: false,
       _meta: {
         "x.ai/folderTrust": { interactive: true },
+        "x.ai/statusLine": true,
       },
     },
     _meta: {

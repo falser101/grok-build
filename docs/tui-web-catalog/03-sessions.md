@@ -9,7 +9,7 @@
 | S-03 | Resume by id | `session/load`。cwd 必须对上存储 key；worktree 会话用自己的 cwd。 | 列表点选 → load。失败展示 shell 错误。 | 是 |
 | S-04 | Resume by title | `/resume` 标题匹配，忽略大小写；唯一手动改名胜出；UUID 形永远走 id。 | 搜索框；展示 id 避免歧义。 | 是（侧栏搜索走 list `query`） |
 | S-05 | Continue 最近 | `-c` / Welcome 默认。当前目录最近一条。 | 「继续」按钮 = 列表按 mtime 第一条。 | 是 |
-| S-06 | Session picker | Ctrl+S / `/resume`。欢迎页列表 + 会话内 overlay。源过滤、卡片展开、复制 id、worktree 里打开。`x.ai/session/list`（facet `_meta["x.ai/facetFilters"].kind`）。`x.ai/partial` 时降级。 | 全屏列表：标题、时间、cwd、状态。搜索走 `x.ai/session_search` 若有。 | 是（左侧按工作区/git root 分组可折叠；组内全部会话） |
+| S-06 | Session picker | Ctrl+S / `/resume`。欢迎页列表 + 会话内 overlay。源过滤、卡片展开、复制 id、worktree 里打开。`x.ai/session/list`（facet `_meta["x.ai/facetFilters"].kind`）。`x.ai/partial` 时降级。 | 全屏列表：标题、时间、cwd、状态。搜索走 `x.ai/session_search` 若有。 | 是（左侧按工作区/git root 分组可折叠；组内可见性对齐 TUI picker：隐藏子 agent、空标题 Build、超 30 天、默认不含 foreign；每组最多 30） |
 | S-07 | 会话信息 | `/session-info` `/status` `/info`：auth、model、turns、context。可点选复制；`c` 复制 id，`y` 复制整块。 | 侧栏或 modal。 | 是（`x.ai/session/info` 弹窗） |
 | S-08 | 重命名 | `/rename` `/title`；`--auto` 取消钉住、恢复自动标题。Dashboard Ctrl+R。fan-out `SessionSummaryGenerated` + `x.ai/titleIsManual`。 | 行内编辑标题。`--auto` 做一个按钮。 | 是 |
 | S-09 | 自动标题 | 首条 prompt 后 LLM 生成；`SessionSummaryGenerated`。手动标题不覆盖。 | 听通知更新标题栏。 | 是 |
@@ -19,7 +19,7 @@
 | S-13 | Rewind / undo | `/rewind` `/undo`；空 prompt 双 Esc。picker 选 turn。`confirm_before_rewind`。跨 compact 边界有 checkpoint。persist-only `RewindMarker`。 | 时间线点某条用户消息 → 确认 → rewind 扩展。reload 滚动区。 | 是（会话菜单选 rewind point） |
 | S-14 | Compact | `/compact [context]`；阈值默认 85% `[session] auto_compact_threshold_percent`。通知：AutoCompactStarted/Completed/Failed/Cancelled、MemoryFlush*、AutoContinueCompleted。 | 命令 + 进度条。听通知。 | 部分：可调 `x.ai/compact_conversation`；时间线一张压缩卡片（开始/完成/失败/取消就地更新，进行中不确定进度条）；无独立百分比进度条 |
 | S-15 | `/context` | 分类：系统、消息、reasoning、空闲；工具定义/skills/MCP 估 token。 | modal 饼图或表。 | 部分：info 弹窗展示 context 字段，无饼图 |
-| S-16 | 退出会话回 Welcome | `/home` `/welcome`。无快捷键。 | 回会话列表。不要关 WS（serve 常驻）。 | 是 |
+| S-16 | 退出会话回 Welcome | `/home` `/welcome`。无快捷键。 | 回会话列表。不要关 WS（serve 常驻）。切到另一会话或回列表时**不** `session/cancel`：进行中的 turn 继续跑，侧栏/Dashboard 标「进行中」；需要批准的标「需要输入」。对齐 TUI Dashboard 切走。 | 是 |
 | S-17 | Worktree 新会话 | Welcome Ctrl+W；Ctrl+N 二次选择；`--worktree`/`-w`/`--ref`。`x.ai/git/worktree/create`。 | 对话框：label、base ref。 | 是（`create_from_worktree_sync` + label/ref） |
 | S-18 | Worktree 里 resume | picker「在 worktree 打开」。`x.ai/session/resolve_local_for_worktree_resume`。 | 选项「在新 worktree 恢复」。 | 部分：`x.ai/git/worktree/resume_session` |
 | S-19 | Worktree GC/list | CLI `grok worktree`；扩展 `x.ai/git/worktree/list|remove|gc|db/*`。auto_gc 政策。 | 设置或 `/worktree` 页。非 P0。 | 部分：设置里 list + GC dry-run |

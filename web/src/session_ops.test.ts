@@ -8,7 +8,11 @@ import {
   buildSessionSearchParams,
   deepLinkSessionId,
   groupSessionsByWorkspace,
+  PICKER_GROUP_LIMIT,
+  pickerDisplayTitle,
+  pickerSessionVisible,
   readSessionCache,
+  selectVisiblePickerSessions,
   writeSessionCache,
   parseForkNewSessionId,
   parseRewindPoints,
@@ -126,6 +130,103 @@ test("sessions group by git root (workspace), falling back to cwd", () => {
   );
   assert.equal(workspaceGroupKey({ sessionId: "x", cwd: null }), UNGROUPED_WORKSPACE_KEY);
   assert.equal(workspaceGroupLabel({ sessionId: "x", cwd: null }), "其它");
+});
+
+test("picker visibility matches TUI resume list", () => {
+  const now = Date.parse("2026-08-24T00:00:00.000Z");
+  const base = {
+    cwd: "/home/falser/Projects/grok-build",
+    updatedAt: "2026-08-20T00:00:00.000Z",
+    source: "local" as const,
+    lastTurnSummary: null,
+    sessionKind: null,
+    adminKind: "build" as const,
+    worktreeLabel: null,
+    gitRootDir: "/home/falser/Projects/grok-build",
+    sourceWorkspaceDir: null,
+    repoName: "grok-build",
+  };
+  const titled = {
+    ...base,
+    sessionId: "titled-1",
+    summary: "Git Pull and Upstream Code Update",
+  };
+  const empty = {
+    ...base,
+    sessionId: "019fa13f-5c60-7e80-bde0-7b2a67427cf0",
+    summary: "",
+  };
+  const subagent = {
+    ...base,
+    sessionId: "child-1",
+    summary: "Investigate the JSON-encoded question below",
+    sessionKind: "subagent",
+  };
+  const old = {
+    ...base,
+    sessionId: "old-1",
+    summary: "Ancient work",
+    updatedAt: "2026-07-01T00:00:00.000Z",
+  };
+  const noTs = {
+    ...base,
+    sessionId: "no-ts",
+    summary: "no timestamp",
+    updatedAt: null,
+  };
+  const chat = {
+    ...base,
+    sessionId: "conv-1",
+    summary: "",
+    source: "conversation",
+    adminKind: "chat" as const,
+    updatedAt: "2020-01-01T00:00:00.000Z",
+  };
+  const claude = {
+    ...base,
+    sessionId: "claude-1",
+    summary: "Claude leftover",
+    source: "claude",
+  };
+  const fromPrompt = {
+    ...base,
+    sessionId: "fp-1",
+    summary: "",
+    firstPrompt: "Fix the auth bug\nmore",
+  };
+
+  assert.equal(pickerSessionVisible(titled, now), true);
+  assert.equal(pickerSessionVisible(empty, now), false);
+  assert.equal(pickerSessionVisible(subagent, now), false);
+  assert.equal(pickerSessionVisible({ ...subagent, sessionKind: "subagent_resume" }, now), false);
+  assert.equal(pickerSessionVisible(old, now), false);
+  assert.equal(pickerSessionVisible(noTs, now), false);
+  assert.equal(pickerSessionVisible(chat, now), true);
+  assert.equal(pickerDisplayTitle(chat), "");
+  assert.equal(pickerSessionVisible(claude, now), false);
+  assert.equal(pickerSessionVisible(fromPrompt, now), true);
+  assert.equal(pickerDisplayTitle(fromPrompt), "Fix the auth bug");
+
+  const kept = selectVisiblePickerSessions(
+    [titled, empty, subagent, old, noTs, chat, claude, fromPrompt],
+    { now, keepIds: [empty.sessionId] },
+  );
+  assert.deepEqual(
+    kept.map((e) => e.sessionId).sort(),
+    [chat.sessionId, empty.sessionId, fromPrompt.sessionId, titled.sessionId].sort(),
+  );
+
+  const cwd = "/repo";
+  const many = Array.from({ length: PICKER_GROUP_LIMIT + 5 }, (_, i) => ({
+    ...base,
+    cwd,
+    gitRootDir: cwd,
+    sessionId: `s-${String(i).padStart(2, "0")}`,
+    summary: `row ${i}`,
+    updatedAt: `2026-08-${String(10 + (i % 14)).padStart(2, "0")}T00:00:00.000Z`,
+  }));
+  const capped = selectVisiblePickerSessions(many, { now });
+  assert.equal(capped.length, PICKER_GROUP_LIMIT);
 });
 
 test("rewind points accept camelCase and snake_case", () => {

@@ -186,6 +186,53 @@ test("injected replay history renders user markdown agent thinking and tools", a
   expect(kinds).toEqual(["user", "think", "agent", "tool"]);
 });
 
+test("header does not show model chip or session tools", async ({ page }) => {
+  await page.goto("/?noconnect=1");
+  await expect(page.locator("#header-status")).toBeHidden();
+  await expect(page.locator(".header-model-wrap")).toBeHidden();
+  await expect(page.locator("#btn-header-model")).toBeHidden();
+  await expect(page.locator(".header-right")).toBeHidden();
+  await expect(page.locator("#composer #btn-model-chip")).toBeVisible();
+});
+
+test("header context chip shows percent from session_status", async ({ page }) => {
+  await page.goto("/?noconnect=1");
+  await expect(page.locator("#header-context")).toHaveText("上下文 —%");
+  await page.evaluate(() => {
+    window.__grokWebTest?.applyUpdate("session/update", {
+      update: {
+        sessionUpdate: "session_status",
+        context_window: {
+          used_percentage: 17,
+          context_tokens: 2000,
+          context_window_size: 12000,
+        },
+      },
+    });
+  });
+  await expect(page.locator("#header-context")).toHaveText("上下文 17%");
+});
+
+test("turn_completed clears thinking status and stop button", async ({ page }) => {
+  await page.goto("/?noconnect=1");
+  await page.evaluate(() => window.__grokWebTest?.setTurnRunning(true));
+  await expect(page.locator("#turn-status")).toHaveText("正在想");
+  await expect(page.locator("#turn-actions")).toBeVisible();
+  await expect(page.locator("#btn-interject")).toBeVisible();
+  await expect(page.locator("#btn-stop")).toBeVisible();
+  await page.evaluate(() => {
+    window.__grokWebTest?.applyUpdate("session/update", {
+      update: { sessionUpdate: "turn_completed", prompt_id: "p-done", stop_reason: "end_turn" },
+    });
+  });
+  await expect(page.locator("#turn-status")).toBeHidden();
+  await expect(page.locator("#turn-actions")).toBeHidden();
+  await expect(page.locator("#btn-stop")).toBeHidden();
+  await expect(page.locator("#composer #btn-send-now")).toHaveCount(0);
+  await expect(page.locator("#composer #btn-interject")).toHaveCount(0);
+  await expect(page.locator("#btn-send")).toBeVisible();
+});
+
 test("thinking expands in the thread instead of opening a modal", async ({ page }) => {
   await page.goto("/?noconnect=1");
   await page.evaluate(() => {
@@ -230,6 +277,57 @@ test("agent and thinking markdown render as HTML not source", async ({ page }) =
   await expect(page.locator(".bubble.agent .body strong")).toHaveText("bold");
   await expect(page.locator(".bubble.agent .body code")).toHaveText("code");
   await expect(page.locator(".bubble.think .body strong")).toHaveText("plan");
+});
+
+test("streaming markdown freezes closed blocks and only rewrites the live tail", async ({
+  page,
+}) => {
+  await page.goto("/?noconnect=1");
+  const chunk = async (eventId: string, text: string) => {
+    await page.evaluate(
+      ({ eventId, text }) => {
+        window.__grokWebTest?.applyUpdate("session/update", {
+          update: {
+            sessionUpdate: "agent_message_chunk",
+            content: { type: "text", text },
+          },
+          _meta: { eventId },
+        });
+      },
+      { eventId, text },
+    );
+  };
+
+  await chunk("md-stream-1", "# Title\n\nHello");
+  const body = page.locator(".bubble.agent .body");
+  await expect(body.locator(":scope > h1")).toHaveText("Title");
+  await expect(body.locator(":scope > .md-live")).toContainText("Hello");
+  await body.locator(":scope > h1").evaluate((el) => {
+    (el as HTMLElement).dataset.frozen = "1";
+  });
+
+  await chunk("md-stream-2", " **world**");
+  await expect(body.locator(":scope > h1")).toHaveAttribute("data-frozen", "1");
+  await expect(body.locator(":scope > .md-live strong")).toHaveText("world");
+  await expect(body.locator(":scope > .md-live")).toContainText("Hello");
+
+  await chunk("md-stream-3", "\n\n```js\nconst x = 1");
+  await expect(body.locator(":scope > h1")).toHaveAttribute("data-frozen", "1");
+  await expect(body.locator(":scope > p")).toContainText("Hello");
+  await expect(body.locator(":scope > p strong")).toHaveText("world");
+  const liveFence = body.locator(":scope > .md-live pre code");
+  await expect(liveFence).toHaveText("const x = 1");
+  await expect(liveFence.locator(".tok-k")).toHaveCount(0);
+
+  await chunk("md-stream-4", "\n```\n\nDone.");
+  await expect(body.locator(":scope > h1")).toHaveAttribute("data-frozen", "1");
+  await expect(body.locator(":scope > pre code .tok-k")).toHaveText("const");
+  await expect(body.locator(":scope > .md-live")).toHaveText("Done.");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(body.locator(":scope > h1")).toBeVisible();
+  await expect(body.locator(":scope > pre")).toBeVisible();
+  await expect(body.locator(":scope > .md-live")).toContainText("Done.");
 });
 
 test("ordered list items number 1 2 3 not 1 1 1", async ({ page }) => {
@@ -697,29 +795,109 @@ test("composer input aligns with the conversation column", async ({ page }) => {
   expect(Math.abs(agent!.x - input!.x)).toBeLessThan(6);
 });
 
-test("composer is a compact pill until text or images fill it", async ({ page }) => {
+test("composer image chips sit inside the box with a hover remove control", async ({
+  page,
+}) => {
+  const pixel =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
   await page.goto("/?noconnect=1");
-  await expect(page.locator("#composer")).toHaveAttribute("data-filled", "0");
+  await page.evaluate((data) => {
+    const prompt = document.getElementById("prompt") as HTMLTextAreaElement;
+    prompt.disabled = false;
+    window.__grokWebTest?.addComposerImage({
+      mimeType: "image/png",
+      data,
+      name: "shot.png",
+    });
+  }, pixel);
+  await expect(page.locator("#composer")).toHaveAttribute("data-filled", "1");
+  const chips = page.locator("#image-chips");
+  await expect(chips).toBeVisible();
+  await expect(page.locator(".composer-main #image-chips")).toHaveCount(1);
+  const [mainBox, chipsBox] = await Promise.all([
+    page.locator(".composer-main").boundingBox(),
+    chips.boundingBox(),
+  ]);
+  expect(mainBox).toBeTruthy();
+  expect(chipsBox).toBeTruthy();
+  expect(chipsBox!.y).toBeGreaterThanOrEqual(mainBox!.y - 1);
+  expect(chipsBox!.y + chipsBox!.height).toBeLessThanOrEqual(mainBox!.y + mainBox!.height + 1);
+  const promptBox = await page.locator("#prompt").boundingBox();
+  expect(promptBox).toBeTruthy();
+  expect(chipsBox!.y + chipsBox!.height).toBeLessThanOrEqual(promptBox!.y + 8);
+  const chip = page.locator(".image-chip").first();
+  const remove = chip.locator(".image-chip-remove");
+  await expect(remove).toHaveCSS("opacity", "0");
+  await chip.hover();
+  await expect(remove).toHaveCSS("opacity", "1");
+  await page.locator("#prompt").click();
+  await expect(page.locator("#prompt")).toHaveCSS("outline-style", "none");
+  await expect(page.locator("#prompt")).toHaveCSS("border-width", "0px");
+  await chip.hover();
+  await remove.click();
+  await expect(page.locator(".image-chip")).toHaveCount(0);
+});
+
+test("composer starts tall and only grows when text wraps, then scrolls at the cap", async ({
+  page,
+}) => {
+  await page.goto("/?noconnect=1");
   await expect(page.locator("#btn-attach")).toBeVisible();
-  await expect(page.locator("#btn-permission-chip")).toBeVisible();
   await expect(page.locator("#btn-model-chip")).toBeVisible();
-  await expect(page.locator("#btn-effort-chip")).toBeVisible();
+  const emptyBox = await page.locator(".composer-main").boundingBox();
+  expect(emptyBox).toBeTruthy();
+  expect(emptyBox!.height).toBeGreaterThan(90);
+  expect(emptyBox!.height).toBeLessThan(170);
   await page.evaluate(() => {
     const prompt = document.getElementById("prompt") as HTMLTextAreaElement;
     prompt.disabled = false;
-    prompt.value = "12321";
+    prompt.value = "短句不换行";
     prompt.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  await expect(page.locator("#composer")).toHaveAttribute("data-filled", "1");
+  const shortBox = await page.locator(".composer-main").boundingBox();
+  expect(shortBox).toBeTruthy();
+  expect(Math.abs(shortBox!.height - emptyBox!.height)).toBeLessThan(4);
+  await page.evaluate(() => {
+    const prompt = document.getElementById("prompt") as HTMLTextAreaElement;
+    prompt.value = "第一行\n第二行\n第三行\n第四行\n第五行";
+    prompt.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const wrapBox = await page.locator(".composer-main").boundingBox();
+  expect(wrapBox).toBeTruthy();
+  expect(wrapBox!.height).toBeGreaterThan(emptyBox!.height + 8);
+  await page.evaluate(() => {
+    const prompt = document.getElementById("prompt") as HTMLTextAreaElement;
+    prompt.value = Array.from({ length: 40 }, (_, i) => `行 ${i + 1}`).join("\n");
+    prompt.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const capBox = await page.locator("#prompt").boundingBox();
+  expect(capBox).toBeTruthy();
+  expect(capBox!.height).toBeLessThanOrEqual(200);
+  const overflow = await page.locator("#prompt").evaluate((el) => {
+    const node = el as HTMLTextAreaElement;
+    const style = getComputedStyle(node);
+    return {
+      overflow: style.overflowY,
+      scroll: node.scrollHeight > node.clientHeight + 1,
+    };
+  });
+  expect(overflow.overflow === "auto" || overflow.overflow === "scroll").toBeTruthy();
+  expect(overflow.scroll).toBe(true);
 });
 
-test("send button becomes stop while a turn is running", async ({ page }) => {
+test("during a turn send stays for queue and send-now appears", async ({ page }) => {
   await page.goto("/?noconnect=1");
   await expect(page.locator("#btn-send")).toBeVisible();
   await expect(page.locator("#btn-stop")).toBeHidden();
+  await expect(page.locator("#turn-actions")).toBeHidden();
+  await expect(page.locator("#composer #btn-send-now")).toHaveCount(0);
   await page.evaluate(() => window.__grokWebTest?.setTurnRunning(true));
-  await expect(page.locator("#btn-send")).toBeHidden();
+  await expect(page.locator("#btn-send")).toBeVisible();
+  await expect(page.locator("#btn-send")).toHaveAttribute("aria-label", "加入队列");
   await expect(page.locator("#btn-stop")).toBeVisible();
+  await expect(page.locator("#turn-actions")).toBeVisible();
+  await expect(page.locator("#turn-actions #btn-send-now")).toBeVisible();
+  await expect(page.locator("#turn-actions #btn-interject")).toBeVisible();
 });
 
 test("composer docks to the bottom after history or a user bubble", async ({ page }) => {

@@ -1,5 +1,5 @@
-import type { Json } from "./protocol";
-import { asRecord, type SessionListEntry } from "./startup";
+import type { Json } from "./protocol.ts";
+import { asRecord, type SessionListEntry } from "./startup.ts";
 
 export const DASH_TITLE = "运行中会话";
 export const DASH_PAGE_TITLE = "会话";
@@ -62,6 +62,7 @@ export type DashLive = {
   blocked: boolean;
   backgroundIds: ReadonlySet<string>;
   loadedIds: ReadonlySet<string>;
+  needsIds?: ReadonlySet<string>;
   roster?: ReadonlyMap<string, RosterHint>;
   now: number;
   recentMs?: number;
@@ -122,10 +123,10 @@ export function inferDashStatus(entry: SessionListEntry, live: DashLive): DashSt
   const terminal = listedTerminalStatus(entry);
   if (terminal) return terminal;
   const isCurrent = Boolean(live.currentSessionId && live.currentSessionId === entry.sessionId);
-  if (isCurrent && live.blocked) return "needs";
+  if (live.needsIds?.has(entry.sessionId) || (isCurrent && live.blocked)) return "needs";
   const bg = live.backgroundIds.has(entry.sessionId);
-  if (isCurrent && (live.turnRunning || live.queued || bg)) return "working";
-  if (bg) return "working";
+  if (isCurrent && (live.turnRunning || live.queued)) return "working";
+  if (!isCurrent && bg) return "working";
   const loaded = isCurrent || live.loadedIds.has(entry.sessionId);
   if (!loaded) return "inactive";
   const updated = parseUpdatedAt(entry.updatedAt, live.now);
@@ -408,6 +409,10 @@ export function rosterToSessionEntry(row: RosterEntry): SessionListEntry {
     gitRootDir: null,
     sourceWorkspaceDir: null,
     repoName: null,
+    numMessages: 0,
+    firstPrompt: null,
+    createdAt: null,
+    hidden: false,
   };
 }
 

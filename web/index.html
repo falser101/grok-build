@@ -348,6 +348,10 @@
         <div id="jump-panel" class="jump-overlay" hidden></div>
         <div id="queue-strip" class="queue-pane" hidden></div>
         <div id="follow-ups" hidden></div>
+        <div id="turn-actions" hidden>
+          <button type="button" id="btn-interject" class="follow-up-chip" title="不打断当前回复，把输入框内容插进去">插入</button>
+          <button type="button" id="btn-send-now" class="follow-up-chip" title="打断当前回复并立刻发送（Ctrl+Enter）">立即发送</button>
+        </div>
         <p class="nudge" id="plan-nudge" hidden>像在做计划。Shift+Tab 可切 plan mode。</p>
         <div id="block-host">
           <button type="button" id="block-pill" hidden></button>
@@ -355,8 +359,8 @@
         </div>
         <form class="composer" id="composer" data-filled="0">
           <input id="file-pick" type="file" hidden multiple />
-          <div id="image-chips"></div>
           <div class="composer-main">
+            <div id="image-chips"></div>
             <button type="button" id="btn-attach" aria-label="添加文件" title="添加文件">
               <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
                 <path
@@ -391,7 +395,6 @@
               <button type="button" id="btn-permission-chip" hidden>每次询问</button>
               <button type="button" id="btn-model-chip">模型</button>
               <button type="button" id="btn-effort-chip">思考</button>
-              <button type="button" id="btn-interject" hidden>插入</button>
               <button type="submit" id="btn-send" disabled aria-label="发送">
                 <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
                   <path

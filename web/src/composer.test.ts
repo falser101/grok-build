@@ -10,6 +10,9 @@ import {
   mapComposerKey,
   parseFuzzyOpen,
   parseFuzzyStatus,
+  buildFuzzyOpenParams,
+  relativizeFuzzyPath,
+  scopeFuzzyMatches,
   parseLocalSlash,
   parsePromptHistory,
   parseQueueChanged,
@@ -22,7 +25,9 @@ import {
   permissionChipLabel,
   effortChipLabel,
   composerIsFilled,
+  nextComposerTextareaHeight,
   shouldEnqueue,
+  composerSubmitIntent,
   slashQuery,
 } from "./composer.ts";
 
@@ -142,6 +147,51 @@ test("queue drain and combine stop at slash", () => {
   assert.equal(combineQueuedTexts(["one", "two", "/compact"], true), "one\ntwo");
 });
 
+test("composer submit intent queues during a turn and send-now drains the head", () => {
+  assert.equal(shouldEnqueue(true, false), true);
+  assert.equal(shouldEnqueue(true, true), false);
+  assert.equal(
+    composerSubmitIntent({
+      hasDraft: true,
+      turnRunning: true,
+      sendNow: false,
+      hasQueue: false,
+      emptyRepeat: false,
+    }),
+    "queue",
+  );
+  assert.equal(
+    composerSubmitIntent({
+      hasDraft: true,
+      turnRunning: true,
+      sendNow: true,
+      hasQueue: true,
+      emptyRepeat: false,
+    }),
+    "send-now",
+  );
+  assert.equal(
+    composerSubmitIntent({
+      hasDraft: false,
+      turnRunning: true,
+      sendNow: true,
+      hasQueue: true,
+      emptyRepeat: false,
+    }),
+    "drain-head",
+  );
+  assert.equal(
+    composerSubmitIntent({
+      hasDraft: false,
+      turnRunning: true,
+      sendNow: false,
+      hasQueue: true,
+      emptyRepeat: false,
+    }),
+    "noop",
+  );
+});
+
 test("paste limit and prompt blocks include text then images", () => {
   assert.equal(pasteTooLarge(PASTE_TEXT_LIMIT + 1, 0), true);
   assert.equal(pasteTooLarge(10, 10), false);
@@ -168,6 +218,27 @@ test("local slash at-query plan nudge and suggest parsers", () => {
   assert.equal(sug.completions[0]?.insertText, "src/main.ts");
   assert.equal(parseFuzzyOpen({ searchId: "abc" }), "abc");
   assert.equal(parseFuzzyStatus({ matches: [{ path: "a.ts", score: 9 }] })[0]?.path, "a.ts");
+  const open = buildFuzzyOpenParams({
+    sessionId: "s1",
+    cwd: "/home/falser/Projects/grok-build",
+    hidden: false,
+  });
+  assert.equal(open.sessionId, "s1");
+  assert.equal(open.cwd, "/home/falser/Projects/grok-build");
+  assert.equal(open.hidden, false);
+  assert.equal(
+    relativizeFuzzyPath("/home/falser/Projects/grok-build/web/src/a.ts", "/home/falser/Projects/grok-build"),
+    "web/src/a.ts",
+  );
+  assert.equal(relativizeFuzzyPath("/etc/passwd", "/home/falser/Projects/grok-build"), null);
+  const scoped = scopeFuzzyMatches(
+    [
+      { path: "/home/falser/Projects/grok-build/README.md", score: 1 },
+      { path: "/home/falser/.bashrc", score: 2 },
+    ],
+    "/home/falser/Projects/grok-build",
+  );
+  assert.deepEqual(scoped.map((r) => r.path), ["README.md"]);
 });
 
 test("prompt history and queue/changed parsers", () => {
@@ -188,6 +259,8 @@ test("composer chrome labels and model state parse", () => {
   assert.equal(effortChipLabel("high"), "高");
   assert.equal(composerIsFilled("", []), false);
   assert.equal(composerIsFilled("hi", []), true);
+  assert.equal(nextComposerTextareaHeight(48, 180), 48);
+  assert.equal(nextComposerTextareaHeight(240, 180), 180);
   const parsed = parseModelState({
     currentModelId: "grok-4",
     availableModels: [{ modelId: "grok-4", name: "Grok 4", _meta: { supportsReasoningEffort: true } }],

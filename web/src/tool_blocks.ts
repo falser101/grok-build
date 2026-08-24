@@ -141,6 +141,22 @@ export function toolFamily(kind: string, title: string, name = "", metaKind = ""
   return "other";
 }
 
+export function isGenericToolLabel(label: string): boolean {
+  const s = label.trim().toLowerCase();
+  return !s || s === "tool" || s === "other" || s === "unknown" || s === "工具";
+}
+
+/** Prefer a real title/name; ACP Other often arrives as kind/title `"tool"`. */
+export function toolDisplayTitle(kind: string, name: string, title: string): string {
+  const t = title.trim();
+  if (t && !isGenericToolLabel(t)) return t;
+  const n = name.trim();
+  if (n && !isGenericToolLabel(n)) return n;
+  const k = kind.trim();
+  if (k && !isGenericToolLabel(k)) return k;
+  return "工具";
+}
+
 export function shortToolLabel(title: string): string {
   const quoted = /`([^`]+)`/.exec(title);
   const raw =
@@ -162,7 +178,7 @@ export function toolSummary(family: ToolFamily, count: number, title: string): s
   if (family === "edit") return count > 1 ? `编辑了 ${count} 个文件` : `编辑 ${label}`;
   if (family === "exec") return count > 1 ? `执行了 ${count} 条命令` : `运行 ${label}`;
   if (family === "mcp") return count > 1 ? `调用了 ${count} 个 MCP 工具` : `调用 ${label}`;
-  return count > 1 ? `用了 ${count} 个工具` : label;
+  return count > 1 ? `用了 ${count} 个工具` : isGenericToolLabel(label) ? "工具" : label;
 }
 
 export function mixedToolSummary(members: { family: string; title: string }[]): string {
@@ -587,7 +603,8 @@ export function formatToolHtml(
   const linked = pathLink(path);
   const cut = opts.full ? { text: body, omitted: 0, total: body.split("\n").length } : truncateLines(body, 10, 3);
   const args = formatToolArgsHtml(opts.args ?? argSnapshot(update), Boolean(opts.streaming));
-  const output = body && body !== title ? `<pre class="tool-output">${escapePre(cut.text)}</pre>${moreButton(cut.omitted, cut.total)}` : "";
+  const echo = isGenericToolLabel(body) || body === title || body === name || body === kind;
+  const output = body && !echo ? `<pre class="tool-output">${escapePre(cut.text)}</pre>${moreButton(cut.omitted, cut.total)}` : "";
   return `${args}${linked}${output}`;
 }
 

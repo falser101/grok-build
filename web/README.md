@@ -19,7 +19,7 @@ npm run dev
 `npm run dev` 做的事：
 
 1. 若 `127.0.0.1:2419` 空闲，启动 **PATH 上已安装的 `grok`**（不是本仓库 cargo 产物），工作目录是 `$HOME`，会话来自 `~/.grok/sessions/`
-2. 侧栏 `x.ai/session/list` **不带 cwd**，列出本机全部会话，不限本仓库
+2. 侧栏 `x.ai/session/list` **不带 cwd**，列出本机全部工作区；每个工作区只展示 TUI `/resume` 会加载的会话（子 agent / 空壳 UUID / 超 30 天 / foreign 不进列表，每组最多 30）
 3. 起 Vite，把 `/ws` 代理到 serve（带 `server-key`）
 4. Ctrl+C 停 Vite；若这次是它拉起的 Agent，一并停掉
 

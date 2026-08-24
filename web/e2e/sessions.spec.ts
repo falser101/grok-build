@@ -78,7 +78,7 @@ test("clicking a list row loads with that row cwd and no reconnect cursor", asyn
     timeout: 30_000,
   });
 
-  await page.locator("#btn-home").click();
+  await page.evaluate(() => window.__grokWebTest?.leaveSession());
   await expect(page.locator("#session-label")).toHaveText("无 session");
   await expect(page.locator("#conn-label")).toHaveText("已连接");
   await expect(page.locator("#welcome")).toBeVisible();
@@ -103,7 +103,7 @@ test("session row menu opens as a floating popover", async ({ page }) => {
     timeout: 30_000,
   });
   const id = (await page.locator("#session-label").innerText()).trim();
-  await page.locator("#btn-home").click();
+  await page.evaluate(() => window.__grokWebTest?.leaveSession());
   const row = page.locator(`.session-row[data-session-id="${id}"]`);
   await expect(row).toBeVisible();
   const wrap = page.locator(".session-row-wrap").filter({ has: row });
@@ -147,7 +147,7 @@ test("leave session returns to the list without closing the WebSocket", async ({
   });
 
   const socketsBefore = cap.sent.length;
-  await page.locator("#btn-home").click();
+  await page.evaluate(() => window.__grokWebTest?.leaveSession());
   await expect(page.locator("#session-label")).toHaveText("无 session");
   await expect(page.locator("#conn-label")).toHaveText("已连接");
   await expect(page.locator("#welcome")).toBeVisible();

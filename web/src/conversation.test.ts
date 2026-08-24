@@ -292,6 +292,22 @@ test("edits and executes stay as their own rows; only reads group", () => {
   assert.equal(tools[2]?.open, false);
 });
 
+test("untitled tool_call does not dump tool into the expanded body", () => {
+  const t = new ConversationTimeline();
+  t.apply("session/update", {
+    update: {
+      sessionUpdate: "tool_call",
+      toolCallId: "anon",
+      kind: "tool",
+      title: "tool",
+      status: "completed",
+    },
+  });
+  const item = t.items.find((i) => i.kind === "tool");
+  assert.equal(item?.title, "工具");
+  assert.equal(item?.html.includes("tool-output"), false);
+});
+
 test("think, reply, tools, think, tools, reply stay in arrival order", () => {
   const t = new ConversationTimeline();
   t.opts.groupTools = true;
@@ -565,6 +581,23 @@ test("thinking is skipped when hidden; prompt_complete folds it", () => {
   });
   t.apply("x.ai/session/prompt_complete", {});
   assert.equal(t.items[0]?.open, false);
+});
+
+test("turn_completed is the durable end-of-turn signal", () => {
+  const t = new ConversationTimeline();
+  t.apply("session/update", {
+    update: { sessionUpdate: "agent_thought_chunk", content: { text: "plan" } },
+  });
+  t.apply("session/update", {
+    update: { sessionUpdate: "agent_message_chunk", content: { text: "done" } },
+  });
+  const effects = t.apply("session/update", {
+    update: { sessionUpdate: "turn_completed", prompt_id: "p1", stop_reason: "end_turn" },
+  });
+  assert.equal(effects.some((e) => e.type === "prompt-complete"), true);
+  assert.equal(t.liveAgentId, null);
+  assert.equal(t.liveThinkId, null);
+  assert.equal(t.items.find((it) => it.kind === "think")?.open, false);
 });
 
 test("model switch does not clutter the timeline", () => {

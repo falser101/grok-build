@@ -71,7 +71,7 @@ Web 客户端按方法接。TUI 已全部使用或可使用。标准方法见 [A
 |---|---|---|---|---|
 | Q-60 | `x.ai/session_notification` | 大包 SessionUpdate 见下 | 按 tag 分发 | 否 |
 | Q-61 | `x.ai/session/update` | 与标准并行/replay | 同 C-34 | 否 |
-| Q-62 | `x.ai/session/prompt_complete` | 回合结束 | 停 spinner、drain 队列 | 否 |
+| Q-62 | `x.ai/session/prompt_complete` | 回合结束 | 停 spinner、drain 队列 | 是：`prompt_complete` + 耐久 `turn_completed` 都清 `turnRunning` / 侧栏点 |
 | Q-63 | `x.ai/queue/changed` | 共享队列真源 | I-19 | 否 |
 | Q-64 | `x.ai/sessions/changed` | roster | D-27 | 否 |
 | Q-65 | `x.ai/search/fuzzy/status` | @ 结果 | I-11 | 否 |

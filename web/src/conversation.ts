@@ -13,6 +13,7 @@ import {
   pathFromUpdate,
   subagentSnapshot,
   toolFamily,
+  toolDisplayTitle,
   toolSummary,
   workflowSnapshot,
   type ToolFamily,
@@ -96,6 +97,12 @@ export type ConversationOptions = {
   showTimestamps: boolean;
   showRail: boolean;
 };
+
+/** Durable ACP terminal on `_x.ai/session/update`. Twin of `x.ai/session/prompt_complete`. */
+export function isTurnTerminalKind(kind: string): boolean {
+  const k = kind.toLowerCase().replace(/-/g, "_");
+  return k === "turn_completed";
+}
 
 let seq = 1;
 function nid(prefix: string): string {
@@ -208,10 +215,7 @@ export class ConversationTimeline {
 
   apply(method: string, params: Json): ConversationEffect[] {
     if (method === "x.ai/session/prompt_complete") {
-      this.liveAgentId = null;
-      this.liveThinkId = null;
-      this.collapseFinishedThinking();
-      return [{ type: "prompt-complete" }, { type: "redraw" }];
+      return this.finishTurn();
     }
     if (method === "x.ai/queue/changed") {
       return [{ type: "queue", params }];
@@ -249,6 +253,9 @@ export class ConversationTimeline {
       (typeof rec?.sessionUpdate === "string" && rec.sessionUpdate) ||
       "";
 
+    if (isTurnTerminalKind(kind)) {
+      return this.finishTurn();
+    }
     if (kind === "session_summary_generated" || rec?.session_summary || rec?.sessionSummary) {
       return [{ type: "title", rec: rec ?? update, meta }];
     }
@@ -580,6 +587,13 @@ export class ConversationTimeline {
     return hits;
   }
 
+  private finishTurn(): ConversationEffect[] {
+    this.liveAgentId = null;
+    this.liveThinkId = null;
+    this.collapseFinishedThinking();
+    return [{ type: "prompt-complete" }, { type: "redraw" }];
+  }
+
   private collapseFinishedThinking() {
     for (const item of this.items) {
       if (item.kind === "think" && !item.manualFold) {
@@ -712,7 +726,7 @@ export class ConversationTimeline {
       }
       return;
     }
-    const displayTitle = rawTitle || toolKind || "tool";
+    const displayTitle = toolDisplayTitle(toolKind, toolName, rawTitle);
     if (
       this.opts.groupTools &&
       isGroupableFamily(family) &&
@@ -724,8 +738,8 @@ export class ConversationTimeline {
       id: nid("tool"),
       kind: "tool",
       who: "tool",
-      text: body || displayTitle,
-      html: formatToolHtml(toolKind, body || displayTitle, update, {
+      text: body,
+      html: formatToolHtml(toolKind, body, update, {
         args: argChunk,
         streaming: isBusyToolStatus(status),
       }),
@@ -740,7 +754,7 @@ export class ConversationTimeline {
       startedAt: now,
       argText: argChunk,
       elapsedMs: elapsedHint ?? undefined,
-      raw: body || displayTitle,
+      raw: body,
       open: family === "edit" || (family !== "skill" && isBusyToolStatus(status) && Boolean(argChunk)),
       hook: hookFrom(update, rec),
       source: update,

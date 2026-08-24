@@ -42,6 +42,8 @@ import {
   parsePaywall,
   parseSessionListPage,
   persistDockFields,
+  notificationSessionId,
+  isFrontSessionStream,
   startupAuthDecision,
   welcomeVersionLine,
   type AuthMethodInfo,
@@ -51,7 +53,7 @@ import {
   type SessionListEntry,
   type StartupAuthDecision,
 } from "./startup";
-import { ConversationTimeline, railPreview } from "./conversation";
+import { ConversationTimeline, isTurnTerminalKind, railPreview } from "./conversation";
 import { enhanceMermaid, patchTimelineItem, renderTimelineItem } from "./conversation_view";
 import {
   EFFORT_OPTIONS,
@@ -61,6 +63,7 @@ import {
   atQuery,
   buildPromptHistoryParams,
   composerIsFilled,
+  nextComposerTextareaHeight,
   drainQueueHead,
   effortChipLabel,
   filterSlashCommands,
@@ -71,6 +74,8 @@ import {
   mapComposerKey,
   parseFuzzyOpen,
   parseFuzzyStatus,
+  buildFuzzyOpenParams,
+  scopeFuzzyMatches,
   parseLocalSlash,
   parseModelState,
   parsePromptHistory,
@@ -80,7 +85,7 @@ import {
   parseSuggestPrompt,
   pasteTooLarge,
   persistComposerPrefs,
-  shouldEnqueue,
+  composerSubmitIntent,
   slashQuery,
   type CatalogModel,
   type ImageChip,
@@ -157,7 +162,9 @@ import {
   deepLinkSessionId,
   formatSessionInfo,
   groupSessionsByWorkspace,
+  pickerDisplayTitle,
   readSessionCache,
+  selectVisiblePickerSessions,
   writeSessionCache,
   parseForkNewSessionId,
   parseRewindPoints,
@@ -303,6 +310,8 @@ const cancelSubagentsPrefEl = $<HTMLSelectElement>("cancel-subagents-pref");
 const composerPrefix = $("composer-prefix");
 const composerWrap = document.querySelector(".composer-input-wrap") as HTMLElement;
 const btnInterject = $<HTMLButtonElement>("btn-interject");
+const btnSendNow = $<HTMLButtonElement>("btn-send-now");
+const turnActionsEl = $("turn-actions");
 const connecting = $("connecting");
 const connectingCopy = $("connecting-copy");
 const doctor = $("doctor");
@@ -367,6 +376,7 @@ let wantOpen = false;
 let reconnectTimer: number | null = null;
 let reconnectAttempt = 0;
 let turnRunning = false;
+let promptEpoch = 0;
 let yoloMode = false;
 let sessionPermMode: SessionPermMode = "ask";
 let showPlanChip: boolean | null = null;
@@ -386,6 +396,8 @@ let authMethods: AuthMethodInfo[] = [];
 let authDecision: StartupAuthDecision | null = null;
 let paywall: PaywallInfo | null = null;
 let recentSessions: SessionListEntry[] = [];
+/** Unfiltered `x.ai/session/list` pages. Visibility is applied in `applyPickerList`. */
+let listedSessionsRaw: SessionListEntry[] = [];
 let handshakeCalls: string[] = [];
 let initialized = false;
 let authRequestSeq = 1;
@@ -415,7 +427,14 @@ let dashPins = loadIdSet(localStorage, DASH_PIN_KEY);
 let dashCollapsed = loadIdSet(localStorage, DASH_COLLAPSE_KEY);
 if (!localStorage.getItem(DASH_COLLAPSE_KEY)) dashCollapsed.add("inactive");
 const backgroundIds = new Set<string>();
+const needsInputIds = new Set<string>();
 const loadedIds = new Set<string>();
+type ParkedBlock = {
+  method: string;
+  params: Json;
+  resolve: (value: Json) => void;
+};
+const parkedBlocks = new Map<string, ParkedBlock[]>();
 let dashRoster: RosterEntry[] = [];
 let dashDeleteArmed: { id: string; at: number } | null = null;
 let paletteItems: PaletteItem[] = [];
@@ -447,6 +466,7 @@ let ghostText = "";
 let atItems: { path: string; score: number }[] = [];
 let atIndex = 0;
 let fuzzySearchId: string | null = null;
+let fuzzySearchKey = "";
 let findHits: { id: string; index: number }[] = [];
 let findCursor = 0;
 
@@ -619,6 +639,7 @@ function dashLive(): DashLive {
     blocked: blockHost.busy,
     backgroundIds,
     loadedIds: loaded,
+    needsIds: needsInputIds,
     roster: roster.size ? roster : undefined,
     now: Date.now(),
   };
@@ -635,6 +656,62 @@ function dashSessionRows(): SessionListEntry[] {
     return mapped;
   }
   return recentSessions;
+}
+
+function parkCurrentTurn(): void {
+  if (sessionId && (turnRunning || blockHost.busy)) {
+    backgroundIds.add(sessionId);
+    if (blockHost.busy) needsInputIds.add(sessionId);
+    turnRunning = false;
+    syncTurnButtons();
+    syncTurnStatus();
+    renderSessionList();
+    if (app.dataset.surface === "dashboard") renderDashboard();
+  }
+}
+
+function offerBlockMethod(method: string, params: Json): Promise<Json> {
+  if (method === "session/request_permission") {
+    if (yoloMode) {
+      const once = firstAllowOnceFrom(params);
+      if (once) return Promise.resolve({ outcome: { outcome: "selected", optionId: once } });
+    }
+    return blockHost.offerPermission(params);
+  }
+  if (method === "x.ai/ask_user_question") return blockHost.offerQuestion(params);
+  if (method === "x.ai/exit_plan_mode") return blockHost.offerPlan(params);
+  if (method === "x.ai/enter_plan_mode" || method === "enter_plan_mode") {
+    const rec = asRecord(params) ?? {};
+    if (!rec.planContent && !rec.plan_content) {
+      rec.planContent = "Agent 请求进入 Plan mode。";
+    }
+    return blockHost.offerPlan(rec).then((out) => {
+      const recOut = asRecord(out);
+      if (recOut?.outcome === "approved") void setSessionMode("plan");
+      return out;
+    });
+  }
+  return Promise.resolve({});
+}
+
+function flushParkedBlocks(sid: string): void {
+  const list = parkedBlocks.get(sid);
+  if (!list?.length) return;
+  parkedBlocks.delete(sid);
+  needsInputIds.delete(sid);
+  void (async () => {
+    for (const item of list) {
+      try {
+        item.resolve(await offerBlockMethod(item.method, item.params));
+      } catch (e) {
+        item.resolve({
+          error: { message: e instanceof Error ? e.message : String(e) },
+        });
+      }
+    }
+    renderSessionList();
+    if (app.dataset.surface === "dashboard") renderDashboard();
+  })();
 }
 
 function noteBackgroundWork(method: string, params: unknown) {
@@ -654,7 +731,34 @@ function noteBackgroundWork(method: string, params: unknown) {
     (typeof rec?.sessionId === "string" && rec.sessionId) ||
     (typeof rec?.session_id === "string" && rec.session_id) ||
     sessionId;
-  if (sid) backgroundIds.add(sid);
+  if (sid && sid !== sessionId) backgroundIds.add(sid);
+}
+
+function endTurn(sid: string | null) {
+  if (sid) {
+    backgroundIds.delete(sid);
+    needsInputIds.delete(sid);
+  }
+  if (!sid || sid === sessionId) {
+    turnRunning = false;
+    syncTurnButtons();
+    syncTurnStatus();
+    if (sessionId) void refreshContextChip(sessionId);
+  }
+  scheduleSidebarStatus(true);
+}
+
+function syncTurnFromRoster() {
+  if (!sessionId) return;
+  const row = dashRoster.find((r) => r.sessionId === sessionId);
+  if (!row) return;
+  if (row.activity === "working") return;
+  if (row.activity === "needs_input") {
+    needsInputIds.add(sessionId);
+    scheduleSidebarStatus();
+    return;
+  }
+  if (turnRunning || backgroundIds.has(sessionId)) endTurn(sessionId);
 }
 
 function selectedDashEntry(): SessionListEntry | null {
@@ -906,10 +1010,17 @@ async function refreshRoster(): Promise<void> {
     for (const row of dashRoster) {
       if (row.resident) loadedIds.add(row.sessionId);
     }
+    syncTurnFromRoster();
     if (app.dataset.surface === "dashboard") renderDashboard();
   } catch {
     /* serve without roster: fall back to disk list already in recentSessions */
   }
+}
+
+function applyPickerList(entries: SessionListEntry[]): SessionListEntry[] {
+  return selectVisiblePickerSessions(entries, {
+    keepIds: sessionId ? [sessionId] : [],
+  });
 }
 
 async function loadMoreSessions() {
@@ -918,12 +1029,13 @@ async function loadMoreSessions() {
     const { sessions, nextCursor } = parseSessionListPage(
       await acpCall("x.ai/session/list", buildSessionListParams({ cursor: sessionListCursor })),
     );
-    const seen = new Set(recentSessions.map((s) => s.sessionId));
+    const seen = new Set(listedSessionsRaw.map((s) => s.sessionId));
     for (const entry of sessions) {
       if (seen.has(entry.sessionId)) continue;
       seen.add(entry.sessionId);
-      recentSessions.push(entry);
+      listedSessionsRaw.push(entry);
     }
+    recentSessions = applyPickerList(listedSessionsRaw);
     sessionListCursor = nextCursor;
     renderDashboard();
     persistSessionCache();
@@ -1306,15 +1418,26 @@ function persistFields() {
 
 function syncTurnButtons() {
   btnStop.hidden = !turnRunning;
-  btnSend.hidden = turnRunning;
-  btnInterject.hidden = !turnRunning;
+  turnActionsEl.hidden = !turnRunning;
+  btnSend.hidden = false;
+  btnSend.setAttribute("aria-label", turnRunning ? "加入队列" : "发送");
+  btnSend.title = turnRunning ? "加入队列，当前回复结束后再发（Enter）" : "发送";
+  if (turnRunning) {
+    hint.textContent = composerPrefs.enterSends
+      ? "正在生成 · Enter 入队 · Ctrl+Enter 立即发送"
+      : "正在生成 · 点发送入队 · Ctrl+Enter 立即发送";
+  }
 }
 
 function syncComposerFilled() {
   const filled = composerIsFilled(promptEl.value, imageChips);
   composer.dataset.filled = filled ? "1" : "0";
   promptEl.style.height = "auto";
-  promptEl.style.height = `${Math.min(promptEl.scrollHeight, 192)}px`;
+  const cssMax = parseFloat(getComputedStyle(promptEl).maxHeight);
+  promptEl.style.height = `${nextComposerTextareaHeight(
+    promptEl.scrollHeight,
+    Number.isFinite(cssMax) ? cssMax : undefined,
+  )}px`;
 }
 
 function syncComposerChips() {
@@ -1373,8 +1496,12 @@ function cycleComposerMode() {
 
 function applyContextUsage(raw: Json) {
   const usage = parseContextUsage(raw);
+  if (usage.percent == null && usage.tokens == null) return;
   headerContext.hidden = false;
   headerContext.textContent = contextChipText(usage);
+  headerContext.dataset.hot = usage.percent != null && usage.percent >= 80 ? "1" : "0";
+  headerContext.title =
+    usage.tokens != null ? `${usage.tokens.toLocaleString()} tokens · ${usage.label}` : usage.label;
   const chip = parseShowPlanChip(raw);
   if (chip != null) showPlanChip = chip;
   const bag =
@@ -1480,6 +1607,7 @@ function applyComposerGate() {
     });
   promptEl.disabled = !allowed;
   btnSend.disabled = !allowed;
+  btnSendNow.disabled = !allowed;
   btnAttach.disabled = !allowed;
   btnNew.disabled = !acp.connected || !authenticated || trustPending || workspaceAckPending;
   btnHome.disabled = !acp.connected || !sessionId;
@@ -1583,28 +1711,27 @@ acp.onRequest = async (req) => {
     handleAgentEvent(req.method, req.params);
     return await promptFolderTrust(req.params);
   }
-  if (req.method === "session/request_permission") {
-    if (yoloMode) {
-      const once = firstAllowOnceFrom(req.params);
-      if (once) return { outcome: { outcome: "selected", optionId: once } };
+  const blockMethods = new Set([
+    "session/request_permission",
+    "x.ai/ask_user_question",
+    "x.ai/exit_plan_mode",
+    "x.ai/enter_plan_mode",
+    "enter_plan_mode",
+  ]);
+  if (blockMethods.has(req.method)) {
+    const sid = notificationSessionId(req.params) || sessionId;
+    if (sid && sessionId && sid !== sessionId) {
+      needsInputIds.add(sid);
+      backgroundIds.add(sid);
+      renderSessionList();
+      if (app.dataset.surface === "dashboard") renderDashboard();
+      return await new Promise<Json>((resolve) => {
+        const list = parkedBlocks.get(sid) ?? [];
+        list.push({ method: req.method, params: req.params, resolve });
+        parkedBlocks.set(sid, list);
+      });
     }
-    return await blockHost.offerPermission(req.params);
-  }
-  if (req.method === "x.ai/ask_user_question") {
-    return await blockHost.offerQuestion(req.params);
-  }
-  if (req.method === "x.ai/exit_plan_mode") {
-    return await blockHost.offerPlan(req.params);
-  }
-  if (req.method === "x.ai/enter_plan_mode" || req.method === "enter_plan_mode") {
-    const rec = asRecord(req.params) ?? {};
-    if (!rec.planContent && !rec.plan_content) {
-      rec.planContent = "Agent 请求进入 Plan mode。";
-    }
-    const out = await blockHost.offerPlan(rec);
-    const recOut = asRecord(out);
-    if (recOut?.outcome === "approved") void setSessionMode("plan");
-    return out;
+    return await offerBlockMethod(req.method, req.params);
   }
   handleAgentEvent(req.method, req.params);
   return {};
@@ -1686,8 +1813,68 @@ function syncTurnStatus() {
   turnStatusEl.hidden = phase === "idle";
 }
 
+let sidebarStatusTimer = 0;
+function scheduleSidebarStatus(immediate = false) {
+  if (immediate) {
+    if (sidebarStatusTimer) {
+      window.clearTimeout(sidebarStatusTimer);
+      sidebarStatusTimer = 0;
+    }
+    renderSessionList();
+    if (app.dataset.surface === "dashboard") renderDashboard();
+    return;
+  }
+  if (sidebarStatusTimer) return;
+  sidebarStatusTimer = window.setTimeout(() => {
+    sidebarStatusTimer = 0;
+    renderSessionList();
+    if (app.dataset.surface === "dashboard") renderDashboard();
+  }, 250);
+}
+
+function recordBackgroundStream(method: string, params: Json, eventSid: string) {
+  const rec = asRecord(params);
+  const update = asRecord((rec?.update as Json) ?? rec);
+  const kind = typeof update?.sessionUpdate === "string" ? update.sessionUpdate : "";
+  if (method === "x.ai/session/prompt_complete" || isTurnTerminalKind(kind)) {
+    endTurn(eventSid);
+    return;
+  }
+  const live =
+    kind.includes("agent_message") ||
+    kind.includes("agent_thought") ||
+    kind.startsWith("tool_call") ||
+    kind.includes("thought_chunk") ||
+    kind === "user_message_chunk";
+  if (live) backgroundIds.add(eventSid);
+  if (kind === "session_summary_generated" || rec?.session_summary || rec?.sessionSummary) {
+    const title =
+      (typeof rec?.session_summary === "string" && rec.session_summary) ||
+      (typeof rec?.sessionSummary === "string" && rec.sessionSummary) ||
+      (typeof rec?.title === "string" && rec.title) ||
+      (typeof update?.title === "string" && update.title) ||
+      null;
+    if (title) {
+      const row = recentSessions.find((s) => s.sessionId === eventSid);
+      if (row) row.summary = title;
+    }
+  }
+  scheduleSidebarStatus();
+}
+
 function handleAgentEvent(method: string, params: Json) {
   noteBackgroundWork(method, params);
+  const eventSid = notificationSessionId(params);
+  if (
+    !isFrontSessionStream({
+      method,
+      eventSessionId: eventSid,
+      currentSessionId: sessionId,
+    })
+  ) {
+    if (eventSid) recordBackgroundStream(method, params, eventSid);
+    return;
+  }
   if (method === "x.ai/yolo_mode_changed" || method === "x.ai/settings/update") {
     const rec = asRecord(params);
     const mode = rec && (typeof rec.permission_mode === "string" ? rec.permission_mode : typeof rec.permissionMode === "string" ? rec.permissionMode : "");
@@ -1720,6 +1907,9 @@ function handleAgentEvent(method: string, params: Json) {
         syncComposerChips();
       }
     }
+    if (kind === "session_status") {
+      applyContextUsage((update ?? params) as Json);
+    }
     if (kind === "model_changed" || kind === "model_auto_switched") {
       const id =
         (typeof update?.modelId === "string" && update.modelId) ||
@@ -1742,13 +1932,15 @@ function handleAgentEvent(method: string, params: Json) {
     const delta = parseRosterChanged(params);
     if (delta.upserted.length || delta.removed.length) {
       dashRoster = applyRosterChanged(dashRoster, delta);
+      syncTurnFromRoster();
     }
     void refreshRoster();
     void refreshSessions();
     return;
   }
   if (method === "x.ai/search/fuzzy/status") {
-    atItems = parseFuzzyStatus(params);
+    const root = currentEntry()?.cwd || workspaceCwd();
+    atItems = scopeFuzzyMatches(parseFuzzyStatus(params), root);
     renderAtMenu();
     return;
   }
@@ -1766,14 +1958,15 @@ function handleAgentEvent(method: string, params: Json) {
     if (effect.type === "queue") applyQueueChanged(effect.params);
     if (effect.type === "follow-ups") renderFollowUps(effect.texts);
     if (effect.type === "prompt-complete") {
-      setState("live", "已连接");
-      hint.textContent = composerPrefs.enterSends
-        ? "Enter 发送 · Shift+Enter 换行"
-        : "Ctrl+Enter 发送 · Enter 换行";
-      turnRunning = false;
-      syncTurnButtons();
-      void drainLocalQueue();
-      void fetchGhost();
+      endTurn(eventSid || sessionId);
+      if (!timeline.replayActive) {
+        setState("live", "已连接");
+        hint.textContent = composerPrefs.enterSends
+          ? "Enter 发送 · Shift+Enter 换行"
+          : "Ctrl+Enter 发送 · Enter 换行";
+        void drainLocalQueue();
+        void fetchGhost();
+      }
     }
   }
   if (redraw) requestPaint();
@@ -1829,6 +2022,18 @@ function renderQueue() {
     const st = document.createElement("div");
     st.className = "queue-card-status";
     st.textContent = "等待中";
+    const sendNow = document.createElement("button");
+    sendNow.type = "button";
+    sendNow.className = "queue-card-send-now";
+    sendNow.textContent = "立即发送";
+    sendNow.title = "打断当前回复，立刻发这条";
+    sendNow.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      queueSelectedId = item.id;
+      promoteSelectedQueueItem();
+      cancelCurrentTurnForSendNow();
+      void drainLocalQueue();
+    });
     const more = document.createElement("button");
     more.type = "button";
     more.className = "queue-card-more";
@@ -1840,7 +2045,7 @@ function renderQueue() {
       if (queueSelectedId === item.id) queueSelectedId = null;
       renderQueue();
     });
-    row.append(name, st, more);
+    row.append(name, st, sendNow, more);
     row.addEventListener("click", () => {
       queueSelectedId = item.id;
       renderQueue();
@@ -2055,9 +2260,11 @@ async function refreshSessions(): Promise<void> {
       if (!nextCursor) break;
       cursor = nextCursor;
     }
-    recentSessions = all;
+    listedSessionsRaw = all;
+    recentSessions = applyPickerList(all);
   } catch {
-    recentSessions = all.length ? all : [];
+    listedSessionsRaw = all.length ? all : [];
+    recentSessions = applyPickerList(listedSessionsRaw);
   }
   renderSessionList();
   if (app.dataset.surface === "sessions") renderSessionIndex();
@@ -2066,8 +2273,9 @@ async function refreshSessions(): Promise<void> {
 }
 
 function sessionTitle(entry: SessionListEntry): string {
-  const summary = entry.summary.trim();
-  if (summary && summary !== entry.sessionId) return summary;
+  const title = pickerDisplayTitle(entry);
+  if (title) return title;
+  if (entry.adminKind === "chat" || entry.source === "conversation") return "Untitled";
   return entry.sessionId.slice(0, 8);
 }
 
@@ -2096,9 +2304,22 @@ function renderSessionRow(entry: SessionListEntry): HTMLElement {
   btn.dataset.sessionId = entry.sessionId;
   if (entry.cwd) btn.dataset.cwd = entry.cwd;
   if (entry.sessionId === sessionId) btn.setAttribute("aria-current", "true");
+  const titleLine = document.createElement("span");
+  titleLine.className = "row-title-line";
+  const live = dashLive();
+  const status = inferDashStatus(entry, live);
+  if (status === "working" || status === "needs") {
+    const dot = document.createElement("span");
+    dot.className = "dash-dot";
+    dot.dataset.kind = dashDotKind(status);
+    dot.dataset.status = status;
+    dot.title = status === "needs" ? "需要输入" : "进行中";
+    titleLine.append(dot);
+  }
   const title = document.createElement("span");
   title.className = "row-title";
   title.textContent = sessionTitle(entry);
+  titleLine.append(title);
   const meta = document.createElement("span");
   meta.className = "row-meta";
   const bits = [
@@ -2112,9 +2333,9 @@ function renderSessionRow(entry: SessionListEntry): HTMLElement {
     const sub = document.createElement("span");
     sub.className = "row-meta";
     sub.textContent = entry.lastTurnSummary;
-    btn.append(title, meta, sub);
+    btn.append(titleLine, meta, sub);
   } else {
-    btn.append(title, meta);
+    btn.append(titleLine, meta);
   }
   if (entry.source === "conversation" || entry.adminKind === "chat") {
     const badge = document.createElement("span");
@@ -2357,16 +2578,7 @@ async function openListedSession(entry: SessionListEntry): Promise<void> {
     applyComposerGate();
     return;
   }
-  if (turnRunning && sessionId && sessionId !== entry.sessionId) {
-    const ok = window.confirm("当前对话还在生成。停止并打开另一个会话？");
-    if (!ok) return;
-    try {
-      acp.notify("session/cancel", buildSessionCancelParams(sessionId));
-    } catch {
-      /* ignore */
-    }
-    turnRunning = false;
-  }
+  parkCurrentTurn();
   await loadSession(entry.sessionId, {
     cwd: entry.cwd,
     cursor: null,
@@ -2436,10 +2648,17 @@ async function loadSession(
   }
   void refreshComposerModel(id);
   if (reconnect) noteSys(`已重连 session ${id}`);
+  if (backgroundIds.has(id)) {
+    turnRunning = true;
+    syncTurnButtons();
+    syncTurnStatus();
+  }
+  flushParkedBlocks(id);
   renderSessionList();
 }
 
 async function newSession(): Promise<void> {
+  parkCurrentTurn();
   if (workspaceAckPending) {
     renderWelcome();
     workspaceAck.hidden = false;
@@ -2476,7 +2695,7 @@ async function newSession(): Promise<void> {
 
 async function refreshComposerModel(id: string) {
   try {
-    const info = await acpCall("x.ai/session/info", buildSessionInfoParams(id));
+    const info = extResultPayload(await acpCall("x.ai/session/info", buildSessionInfoParams(id)));
     applyModelState(info);
     applyContextUsage(info);
   } catch {
@@ -2506,6 +2725,7 @@ function persistSessionCache(lastId: string | null = sessionId) {
 }
 
 function setSession(id: string) {
+  if (sessionId && sessionId !== id) void closeFuzzy();
   sessionId = id;
   loadedIds.add(id);
   const row = recentSessions.find((s) => s.sessionId === id);
@@ -2619,6 +2839,29 @@ function scheduleReconnect(): void {
   }, delay);
 }
 
+function cancelCurrentTurnForSendNow() {
+  if (!turnRunning || !sessionId || !acp.connected) {
+    turnRunning = false;
+    return;
+  }
+  try {
+    acp.notify("session/cancel", buildSessionCancelParams(sessionId));
+  } catch {
+    /* keep going */
+  }
+  turnRunning = false;
+  syncTurnButtons();
+  syncTurnStatus();
+}
+
+function promoteSelectedQueueItem() {
+  if (!queueSelectedId) return;
+  const idx = localQueue.findIndex((q) => q.id === queueSelectedId);
+  if (idx <= 0) return;
+  const item = localQueue[idx]!;
+  localQueue = [item, ...localQueue.filter((q) => q.id !== item.id)];
+}
+
 async function drainLocalQueue(): Promise<void> {
   if (turnRunning) return;
   const { next, rest } = drainQueueHead(localQueue);
@@ -2648,12 +2891,16 @@ async function submitComposer(opts: {
     .map((c) => `${workspaceCwd() || ""}/${c.name}`.replace(/\/+/g, "/"))
     .join(" ");
   const text = extra ? `${rawText} ${extra}`.trim() : rawText;
-  if (!text.trim() && pics.length === 0) {
-    const now = Date.now();
-    if (now - lastEmptyEnterAt < 800 || opts.sendNow) {
-      lastEmptyEnterAt = 0;
-      await drainLocalQueue();
-    } else lastEmptyEnterAt = now;
+  const hasDraft = Boolean(text.trim() || pics.length);
+  const intent = composerSubmitIntent({
+    hasDraft,
+    turnRunning,
+    sendNow: Boolean(opts.sendNow),
+    hasQueue: localQueue.length > 0,
+    emptyRepeat: Date.now() - lastEmptyEnterAt < 800,
+  });
+  if (intent === "noop") {
+    lastEmptyEnterAt = hasDraft ? 0 : Date.now();
     return;
   }
   lastEmptyEnterAt = 0;
@@ -2667,7 +2914,7 @@ async function submitComposer(opts: {
   ) {
     return;
   }
-  if (!opts.literal) {
+  if (hasDraft && !opts.literal) {
     const local = parseLocalSlash(text);
     if (local && (await runLocalSlash(local))) {
       promptEl.value = "";
@@ -2675,13 +2922,7 @@ async function submitComposer(opts: {
       return;
     }
   }
-  if (composerMode === "remember" && !text.startsWith("/")) {
-    await sendPrompt(`/remember ${text}`, pics, opts);
-    composerMode = "";
-    setComposerMode("");
-    return;
-  }
-  if (shouldEnqueue(turnRunning, Boolean(opts.sendNow))) {
+  if (intent === "queue") {
     localQueue = [
       ...localQueue,
       { id: `q-${queueIdSeq++}`, text, images: [...pics] },
@@ -2692,14 +2933,21 @@ async function submitComposer(opts: {
     renderQueue();
     return;
   }
-  if (opts.sendNow && turnRunning && sessionId && acp.connected) {
-    try {
-      acp.notify("session/cancel", buildSessionCancelParams(sessionId));
-    } catch {
-      /* keep going */
+  if (intent === "drain-head") {
+    if (opts.sendNow) {
+      promoteSelectedQueueItem();
+      cancelCurrentTurnForSendNow();
     }
-    turnRunning = false;
+    await drainLocalQueue();
+    return;
   }
+  if (composerMode === "remember" && !text.startsWith("/")) {
+    await sendPrompt(`/remember ${text}`, pics, opts);
+    composerMode = "";
+    setComposerMode("");
+    return;
+  }
+  if (intent === "send-now") cancelCurrentTurnForSendNow();
   promptEl.value = "";
   imageChips = [];
   renderImageChips();
@@ -3032,6 +3280,8 @@ async function sendPrompt(
   }
   if (!sessionId) await newSession();
   if (!sessionId) return;
+  const promptSid = sessionId;
+  const epoch = ++promptEpoch;
   timeline.endReplay(0);
   showSurface("session");
   const item = timeline.insertUser(
@@ -3043,7 +3293,6 @@ async function sendPrompt(
   el?.scrollIntoView({ block: "start" });
   if (text.trim()) sentHistory.unshift(text.trim());
   setState("busy", "session/prompt…");
-  hint.textContent = "生成中";
   turnRunning = true;
   syncTurnButtons();
   syncTurnStatus();
@@ -3052,7 +3301,7 @@ async function sendPrompt(
     await acp.request(
       "session/prompt",
       buildSessionPromptParams({
-        sessionId,
+        sessionId: promptSid,
         text,
         images: images.map((img, i) => ({
           mimeType: img.mimeType,
@@ -3063,11 +3312,16 @@ async function sendPrompt(
         sendNow: opts.sendNow,
         screenMode: SCREEN_MODE_WEB,
       }),
+      0,
     );
   } finally {
-    turnRunning = false;
-    syncTurnButtons();
-    syncTurnStatus();
+    if (epoch === promptEpoch && sessionId === promptSid) {
+      turnRunning = false;
+      syncTurnButtons();
+      syncTurnStatus();
+    }
+    renderSessionList();
+    if (app.dataset.surface === "dashboard") renderDashboard();
   }
   setState("live", "已连接");
   hint.textContent = composerPrefs.enterSends
@@ -3154,20 +3408,14 @@ function clearSessionView() {
 
 function leaveSession() {
   const id = sessionId;
-  if (turnRunning && id && acp.connected) {
-    try {
-      acp.notify("session/cancel", buildSessionCancelParams(id));
-    } catch {
-      /* keep the socket */
-    }
-    turnRunning = false;
-  }
-  if (id && acp.connected) {
+  void closeFuzzy();
+  parkCurrentTurn();
+  if (id && acp.connected && !backgroundIds.has(id) && !needsInputIds.has(id)) {
     acp.request("x.ai/session/close", buildSessionCloseParams(id)).catch(() => {
       /* close is best-effort */
     });
   }
-  if (id) loadedIds.delete(id);
+  if (id && !backgroundIds.has(id)) loadedIds.delete(id);
   titlePinned = false;
   clearSessionView();
   persistSessionCache(null);
@@ -4023,20 +4271,40 @@ function acceptAt(path: string) {
   promptEl.focus();
 }
 
-async function ensureFuzzy(query: string) {
+function atSearchRoot(): string {
+  return (currentEntry()?.cwd || workspaceCwd()).trim();
+}
+
+async function closeFuzzy() {
+  const id = fuzzySearchId;
+  fuzzySearchId = null;
+  fuzzySearchKey = "";
+  if (!id || !acp.connected) return;
   try {
+    await acp.request("x.ai/search/fuzzy/close", { searchId: id });
+  } catch {
+    /* already gone */
+  }
+}
+
+async function ensureFuzzy(query: string) {
+  const root = atSearchRoot();
+  const hidden = query.startsWith("!");
+  const key = `${root}\0${hidden ? "1" : "0"}`;
+  try {
+    if (fuzzySearchId && fuzzySearchKey !== key) await closeFuzzy();
     if (!fuzzySearchId) {
-      const params: { [k: string]: Json } = {};
-      if (sessionId) params.sessionId = sessionId;
-      const directory = workspaceCwd();
-      if (directory) params.cwd = directory;
-      const raw = await acp.request("x.ai/search/fuzzy/open", params);
+      const raw = await acp.request(
+        "x.ai/search/fuzzy/open",
+        buildFuzzyOpenParams({ sessionId, cwd: root, hidden }),
+      );
       fuzzySearchId = parseFuzzyOpen(raw);
+      fuzzySearchKey = key;
     }
     if (fuzzySearchId) {
       await acp.request("x.ai/search/fuzzy/change", {
         searchId: fuzzySearchId,
-        query,
+        query: hidden ? query.slice(1) : query,
         limit: 30,
       });
     }
@@ -4148,11 +4416,11 @@ function openModelPicker() {
 
 async function refreshContextChip(id: string) {
   try {
-    const info = await acpCall("x.ai/session/info", buildSessionInfoParams(id));
+    const info = extResultPayload(await acpCall("x.ai/session/info", buildSessionInfoParams(id)));
     applyModelState(info);
     applyContextUsage(info);
   } catch {
-    headerContext.textContent = "上下文 —%";
+    if (!/\d/.test(headerContext.textContent ?? "")) headerContext.textContent = "上下文 —%";
   }
 }
 
@@ -4382,10 +4650,8 @@ async function openPromptHistory() {
 function renderImageChips() {
   imageChipsEl.replaceChildren();
   for (const chip of imageChips) {
-    const el = document.createElement("button");
-    el.type = "button";
+    const el = document.createElement("div");
     el.className = "image-chip";
-    el.title = "点击移除";
     const src = `data:${chip.mimeType};base64,${chip.data}`;
     if ((chip.kind ?? "image") === "video") {
       const node = document.createElement("video");
@@ -4400,10 +4666,20 @@ function renderImageChips() {
       thumb.src = src;
       el.append(thumb);
     }
-    el.addEventListener("click", () => {
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "image-chip-remove";
+    remove.setAttribute("aria-label", `移除 ${chip.name}`);
+    remove.title = "移除";
+    remove.innerHTML =
+      '<svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M3 3l6 6M9 3L3 9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+    remove.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
       imageChips = imageChips.filter((c) => c.id !== chip.id);
       renderImageChips();
     });
+    el.append(remove);
     imageChipsEl.append(el);
   }
   syncComposerFilled();
@@ -4812,11 +5088,21 @@ document.addEventListener("keydown", (ev) => {
 
 btnInterject.addEventListener("click", () => {
   const text = promptEl.value.trim();
-  if (!text || !sessionId) return;
+  if (!text || !sessionId) {
+    promptEl.focus();
+    showBanner("先输入要插入的内容", "interject");
+    return;
+  }
   promptEl.value = "";
   acp
     .request("x.ai/interject", { sessionId, text })
     .catch((e) => showBanner(e instanceof Error ? e.message : String(e)));
+});
+
+btnSendNow.addEventListener("click", () => {
+  void submitComposer({ sendNow: true }).catch((e) =>
+    showBanner(e instanceof Error ? e.message : String(e)),
+  );
 });
 
 
@@ -4950,7 +5236,9 @@ setConnectedUi(false);
   const cached = readSessionCache(localStorage);
   const bootRoute = parseHashRoute(location.hash);
   if (cached?.sessions.length) {
-    recentSessions = cached.sessions;
+    recentSessions = selectVisiblePickerSessions(cached.sessions, {
+      keepIds: cached.lastId ? [cached.lastId] : [],
+    });
     pendingResumeId = cached.lastId;
     renderSessionList();
     if (bootRoute.kind === "dashboard") {
@@ -5168,6 +5456,7 @@ declare global {
       offerQuestion: (params: Json) => Promise<Json>;
       offerPlan: (params: Json) => Promise<Json>;
       blockBusy: () => boolean;
+      addComposerImage: (input: { mimeType: string; data: string; name?: string }) => void;
     };
   }
 }
@@ -5217,6 +5506,19 @@ window.__grokWebTest = {
     showSurface("session");
     timeline.insertUser(text);
     syncThread();
+  },
+  addComposerImage: (input) => {
+    imageChips = [
+      ...imageChips,
+      {
+        id: `img-${queueIdSeq++}`,
+        mimeType: input.mimeType,
+        data: input.data,
+        name: input.name || "image",
+        kind: "image",
+      },
+    ];
+    renderImageChips();
   },
   nthAgentText: (n) => timeline.nthAgent(n)?.text ?? null,
   offerPermission: (params) => blockHost.offerPermission(params),

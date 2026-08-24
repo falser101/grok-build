@@ -30,6 +30,9 @@ import {
   persistDockFields,
   persistableDockFields,
   parseSessionListPage,
+  notificationSessionId,
+  timelineEventIsForeign,
+  isFrontSessionStream,
   buildSessionListParams,
   sessionListParamsAreGlobal,
   SESSION_LIST_PAGE_SIZE,
@@ -277,6 +280,23 @@ test("paywall consent session list and session/new workspace ACK helpers", () =>
     sessions: [{ sessionId: "s1", summary: "hello", cwd: "/repo" }],
   });
   assert.equal(sessions[0]?.sessionId, "s1");
+  const empty = parseSessionList({
+    sessions: [
+      {
+        sessionId: "019fa13f-5c60-7e80-bde0-7b2a67427cf0",
+        summary: "",
+        session_kind: "subagent",
+        numMessages: 0,
+        hidden: true,
+        first_prompt: "Investigate the JSON packet",
+      },
+    ],
+  });
+  assert.equal(empty[0]?.summary, "");
+  assert.equal(empty[0]?.sessionKind, "subagent");
+  assert.equal(empty[0]?.numMessages, 0);
+  assert.equal(empty[0]?.hidden, true);
+  assert.equal(empty[0]?.firstPrompt, "Investigate the JSON packet");
   const page = parseSessionListPage({
     sessions: [{ sessionId: "s1", summary: "hello", cwd: "/other" }],
     nextCursor: "p2",
@@ -310,5 +330,30 @@ test("paywall consent session list and session/new workspace ACK helpers", () =>
   assert.equal(
     (buildAuthenticateParams("cached_token") as { methodId: string }).methodId,
     "cached_token",
+  );
+});
+
+test("session notifications for another id are foreign to the visible timeline", () => {
+  assert.equal(notificationSessionId({ sessionId: "a" }), "a");
+  assert.equal(notificationSessionId({ session_id: "b" }), "b");
+  assert.equal(notificationSessionId({ update: { sessionUpdate: "agent_message_chunk" } }), null);
+  assert.equal(timelineEventIsForeign("a", "b"), true);
+  assert.equal(timelineEventIsForeign("a", "a"), false);
+  assert.equal(timelineEventIsForeign(null, "a"), false);
+  assert.equal(
+    isFrontSessionStream({
+      method: "session/update",
+      eventSessionId: "bg",
+      currentSessionId: "front",
+    }),
+    false,
+  );
+  assert.equal(
+    isFrontSessionStream({
+      method: "session/update",
+      eventSessionId: "front",
+      currentSessionId: "front",
+    }),
+    true,
   );
 });

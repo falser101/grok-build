@@ -414,6 +414,18 @@ body {
   background: var(--bg-3);
 }
 
+.session-row .row-title-line {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.session-row .row-title-line .dash-dot {
+  flex: 0 0 auto;
+}
+
 .session-row .row-title {
   font-size: 0.86rem;
   overflow: hidden;
@@ -1402,54 +1414,63 @@ button:disabled {
 }
 
 .composer-main {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.35rem 0.4rem 0.35rem 0.45rem;
-  min-height: 3.1rem;
-}
-
-#composer[data-filled="1"] .composer-main {
   display: grid;
   grid-template-columns: auto 1fr auto;
   grid-template-areas:
     "prompt prompt prompt"
     "attach . end";
   align-items: center;
-  gap: 0.45rem 0.4rem;
+  gap: 0.4rem 0.4rem;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 22px;
-  padding: 0.75rem 0.8rem 0.55rem;
+  padding: 0.6rem 0.8rem 0.45rem;
 }
 
-#composer[data-filled="1"] .composer-input-wrap {
+.composer-main:has(#image-chips:not(:empty)) {
+  grid-template-areas:
+    "chips chips chips"
+    "prompt prompt prompt"
+    "attach . end";
+  align-items: start;
+}
+
+.composer-input-wrap {
   grid-area: prompt;
 }
 
-#composer[data-filled="1"] #btn-attach {
+#composer #btn-attach {
   grid-area: attach;
+  align-self: center;
 }
 
-#composer[data-filled="1"] .composer-toolbar-end {
+.composer-toolbar-end {
   grid-area: end;
+  align-self: center;
+}
+
+#composer #image-chips {
+  grid-area: chips;
 }
 
 .composer textarea {
   resize: none;
-  min-height: 1.6rem;
+  min-height: 3.15rem;
   max-height: 12rem;
+  overflow-y: auto;
   background: transparent;
   border: 0;
   border-radius: 0;
-  padding: 0.35rem 0.4rem;
+  padding: 0.2rem 0.35rem;
   box-shadow: none;
   width: 100%;
 }
 
-#composer[data-filled="1"] textarea {
-  min-height: 4.5rem;
+.composer textarea:focus,
+.composer textarea:focus-visible,
+.composer button:focus,
+.composer button:focus-visible {
+  outline: none;
 }
 
 .composer-toolbar-end {
@@ -1520,8 +1541,7 @@ button:disabled {
 }
 
 #btn-send[hidden],
-#btn-stop[hidden],
-#btn-interject[hidden] {
+#btn-stop[hidden] {
   display: none;
 }
 
@@ -1884,9 +1904,17 @@ code {
   margin: 0.45rem 0;
 }
 
-.bubble.agent .body p:first-child,
-.bubble.think .body p:first-child {
+.bubble.agent .body > p:first-child,
+.bubble.think .body > p:first-child,
+.bubble.btw .body > p:first-child,
+.bubble.agent .body > .md-live:first-child > p:first-child,
+.bubble.think .body > .md-live:first-child > p:first-child,
+.bubble.btw .body > .md-live:first-child > p:first-child {
   margin-top: 0;
+}
+
+.body > .md-live {
+  display: block;
 }
 
 .bubble.agent .body ul,
@@ -2053,7 +2081,8 @@ code {
 }
 
 #queue-strip,
-#follow-ups {
+#follow-ups,
+#turn-actions {
   width: var(--column);
   max-width: 100%;
   margin-inline: auto;
@@ -2065,24 +2094,29 @@ code {
   gap: 0.35rem;
 }
 
+#follow-ups,
+#turn-actions {
+  justify-content: flex-end;
+}
+
 #image-chips {
   width: 100%;
   margin: 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: 0.45rem;
 }
 
 #queue-strip[hidden],
 #follow-ups[hidden],
+#turn-actions[hidden],
 #image-chips:empty {
   display: none;
 }
 
 .queue-item,
-.follow-up-chip,
-.image-chip {
+.follow-up-chip {
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 0.2rem 0.55rem;
@@ -2587,8 +2621,8 @@ html[data-theme="light"] .ansi-cyan { color: #0e7474; }
 
 #ghost {
   position: absolute;
-  left: 0.95rem;
-  top: 0.85rem;
+  left: 0.35rem;
+  top: 0.2rem;
   color: #ffffff44;
   pointer-events: none;
   white-space: pre-wrap;
@@ -2902,50 +2936,33 @@ html[data-theme="light"] .ansi-cyan { color: #0e7474; }
   padding: 0.02rem 0.28rem;
 }
 
-.composer.unfocused textarea {
-  min-height: 1.6rem;
-}
-
-.image-chip {
-  position: relative;
-}
-
-.image-chip .thumb {
-  display: none;
-  position: absolute;
-  bottom: 120%;
-  left: 0;
-  max-width: 8rem;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-}
-
-.image-chip:hover .thumb {
-  display: block;
-}
-
 #composer #image-chips {
   display: none;
 }
 
-#composer[data-filled="1"] #image-chips:not(:empty) {
+#composer #image-chips:not(:empty) {
   display: flex;
   flex-wrap: nowrap;
-  gap: 0.45rem;
-  padding: 0 0.15rem 0.15rem;
+  align-items: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  margin: 0;
+  padding: 0 0.05rem 0.15rem;
   overflow-x: auto;
 }
 
 #composer .image-chip {
+  position: relative;
   flex: 0 0 auto;
-  width: 3.4rem;
-  height: 3.4rem;
+  width: 3.6rem;
+  height: 3.6rem;
+  margin: 0;
   padding: 0;
+  border: 0;
   border-radius: 12px;
   overflow: hidden;
-  font-size: 0;
-  color: transparent;
   background: var(--bg-3);
+  box-shadow: none;
 }
 
 #composer .image-chip .thumb,
@@ -2957,6 +2974,36 @@ html[data-theme="light"] .ansi-cyan { color: #0e7474; }
   max-width: none;
   object-fit: cover;
   border: 0;
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+#composer .image-chip-remove {
+  position: absolute;
+  top: 0.22rem;
+  right: 0.22rem;
+  z-index: 1;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 72%);
+  color: #fff;
+  opacity: 0;
+  cursor: pointer;
+}
+
+#composer .image-chip:hover .image-chip-remove,
+#composer .image-chip:focus-within .image-chip-remove {
+  opacity: 1;
+}
+
+#composer .image-chip-remove:hover {
+  background: rgb(0 0 0 / 88%);
 }
 
 .hook-foot {
@@ -3006,21 +3053,22 @@ html[data-compact="1"] #sidebar #btn-new {
 }
 
 .header-left {
-  flex: 1 1 0;
-}
-
-.header-right {
-  flex: 1 1 0;
-  justify-content: flex-end;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .header-status {
-  display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
   min-width: 0;
   flex: 0 1 auto;
+}
+
+.header-status,
+.header-right,
+.header-model-wrap {
+  display: none;
 }
 
 #btn-header-model {
@@ -3081,6 +3129,10 @@ html[data-compact="1"] #sidebar #btn-new {
   padding: 0.08rem 0.15rem;
 }
 
+#header-context[data-hot="1"] {
+  color: #e6b450;
+}
+
 #header-yolo {
   color: var(--ink);
 }
@@ -3137,6 +3189,7 @@ html[data-compact="1"] #sidebar #btn-new {
 
 #app[data-queue="1"] .stage-chat,
 #app[data-queue="1"] #follow-ups,
+#app[data-queue="1"] #turn-actions,
 #app[data-queue="1"] .composer {
   padding-right: min(18.2rem, calc(42vw + 0.7rem));
 }
@@ -3191,6 +3244,19 @@ html[data-compact="1"] #sidebar #btn-new {
 .queue-card-status {
   color: var(--muted);
   font-size: 0.72rem;
+}
+
+.queue-card-send-now {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.12rem 0.5rem;
+  cursor: pointer;
 }
 
 .queue-card-more {

@@ -226,36 +226,61 @@ function firstNum(bags: Array<{ [k: string]: unknown } | null>, keys: string[]):
   return null;
 }
 
+function asObj(value: unknown): { [k: string]: unknown } | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as { [k: string]: unknown })
+    : null;
+}
+
 export function parseContextUsage(payload: unknown): {
   percent: number | null;
   tokens: number | null;
   label: string;
 } {
-  const rec =
-    payload && typeof payload === "object" && !Array.isArray(payload)
-      ? (payload as { [k: string]: unknown })
-      : null;
-  const inner =
-    rec?.result && typeof rec.result === "object" && !Array.isArray(rec.result)
-      ? (rec.result as { [k: string]: unknown })
-      : rec;
-  const data =
-    inner?.data && typeof inner.data === "object" && !Array.isArray(inner.data)
-      ? (inner.data as { [k: string]: unknown })
-      : inner;
+  const rec = asObj(payload);
+  const inner = asObj(rec?.result) ?? rec;
+  const data = asObj(inner?.data) ?? inner;
+  const update = asObj(inner?.update) ?? asObj(data?.update) ?? asObj(rec?.update);
   const ctx =
-    data?.context && typeof data.context === "object" && !Array.isArray(data.context)
-      ? (data.context as { [k: string]: unknown })
-      : null;
-  const bags = [ctx, data, inner, rec];
-  let percent = firstNum(bags, ["usedPercent", "used_percent", "percent", "contextPercent", "context_percent"]);
-  const tokens = firstNum(bags, ["tokens", "usedTokens", "used_tokens", "tokensUsed", "tokens_used"]);
+    asObj(data?.context) ?? asObj(inner?.context) ?? asObj(update?.context) ?? null;
+  const win =
+    asObj(data?.context_window) ??
+    asObj(data?.contextWindow) ??
+    asObj(inner?.context_window) ??
+    asObj(update?.context_window) ??
+    asObj(ctx?.context_window) ??
+    null;
+  const bags = [ctx, win, data, inner, rec, update];
+  let percent = firstNum(bags, [
+    "usedPercent",
+    "used_percent",
+    "usagePct",
+    "usage_pct",
+    "used_percentage",
+    "usedPercentage",
+    "percent",
+    "contextPercent",
+    "context_percent",
+  ]);
+  const tokens = firstNum(bags, [
+    "used",
+    "tokens",
+    "usedTokens",
+    "used_tokens",
+    "tokensUsed",
+    "tokens_used",
+    "context_tokens",
+    "contextTokens",
+  ]);
   const limit = firstNum(bags, [
+    "total",
     "limit",
     "maxTokens",
     "max_tokens",
     "contextWindow",
     "context_window",
+    "context_window_size",
+    "contextWindowSize",
     "window",
     "tokenLimit",
     "token_limit",

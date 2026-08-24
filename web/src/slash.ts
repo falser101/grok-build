@@ -193,6 +193,13 @@ export function planSlash(text: string): SlashPlan {
   return { kind: "send", name, args, text: body };
 }
 
+/** Colon-form skill send, e.g. `/bundled:imagine …`. Bare `/imagine` stays later-toast. */
+export function skillUsedFromPrompt(text: string): string | null {
+  const plan = planSlash(text);
+  if (plan.kind === "send" && plan.name.includes(":")) return plan.name;
+  return null;
+}
+
 /** Intercept pager-local / later / forbidden so they never leak as a user prompt. */
 export function parseLocalSlash(text: string): LocalSlash | null {
   const plan = planSlash(text);

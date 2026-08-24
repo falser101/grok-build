@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   diffLines,
+  formatToolArgsHtml,
   formatToolHtml,
   parseSearchHits,
   prettyToolArgs,
@@ -135,4 +136,24 @@ test("pending_user label and pretty args", () => {
   assert.equal(formatToolElapsed(1200), "1.2s");
   assert.equal(prettyToolArgs('{"a":1}'), '{\n  "a": 1\n}');
   assert.equal(mergeArgStream('{"a":1}', '{"b":2}'), '{"a":1,"b":2}');
+});
+
+test("formatToolArgsHtml pretty-prints JSON and formatToolHtml prepends it", () => {
+  assert.match(formatToolArgsHtml('{"a":1}', false), /参数/);
+  assert.match(formatToolArgsHtml('{"a":1}', false), /"a": 1/);
+  const write = formatToolHtml("edit", "Write approval-probe-11b to b.txt", {
+    kind: "edit",
+    title: "Write approval-probe-11b to b.txt",
+    arguments: { path: "b.txt", contents: "ok" },
+  });
+  assert.match(write, /tool-args/);
+  assert.match(write, /"path": "b.txt"/);
+  const list = formatToolHtml("list", "List '/workspace'", {
+    kind: "list",
+    title: "List '/workspace'",
+    input: { path: "/workspace" },
+  });
+  assert.match(list, /"path": "\/workspace"/);
+  const skill = formatToolHtml("skill", "", { name: "bundled:imagine", title: "skill" });
+  assert.equal(skill.includes("tool-args"), false);
 });

@@ -779,3 +779,59 @@ test("skill tool titles 使用了 skill", () => {
   });
   assert.match(t.items[0]?.title ?? "", /使用了 skill/);
 });
+
+test("prompt_complete marks last live agent for feedback; replay stays quiet", () => {
+  const t = new ConversationTimeline();
+  t.apply("session/update", {
+    update: { sessionUpdate: "agent_message_chunk", content: { text: "hi" } },
+  });
+  t.apply("x.ai/session/prompt_complete", {});
+  assert.equal(t.items.find((it) => it.kind === "agent")?.feedback, "pending");
+
+  const replay = new ConversationTimeline();
+  replay.beginReplay();
+  replay.apply("session/update", {
+    update: { sessionUpdate: "agent_message_chunk", content: { text: "old" } },
+    _meta: { isReplay: true },
+  });
+  replay.apply("x.ai/session/prompt_complete", {});
+  assert.equal(replay.items.find((it) => it.kind === "agent")?.feedback, undefined);
+});
+
+test("noteSkillUsed inserts a skill line once", () => {
+  const t = new ConversationTimeline();
+  t.insertUser("/bundled:imagine hi");
+  t.noteSkillUsed("bundled:imagine");
+  t.noteSkillUsed("bundled:imagine");
+  const tools = t.items.filter((it) => it.kind === "tool");
+  assert.equal(tools.length, 1);
+  assert.equal(tools[0]?.title, "使用了 skill bundled:imagine");
+  assert.equal(tools[0]?.members?.[0]?.family, "skill");
+});
+
+test("tool args persist when complete update drops rawInput", () => {
+  const t = new ConversationTimeline();
+  t.opts.groupTools = false;
+  t.apply("session/update", {
+    update: {
+      sessionUpdate: "tool_call",
+      toolCallId: "w1",
+      kind: "edit",
+      title: "Write approval-probe-11b to b.txt",
+      status: "in_progress",
+      arguments: { path: "b.txt", contents: "ok" },
+    },
+  });
+  assert.ok(t.items[0]?.argText?.includes("b.txt"));
+  t.apply("session/update", {
+    update: {
+      sessionUpdate: "tool_call_update",
+      toolCallId: "w1",
+      status: "completed",
+      elapsed_ms: 1500,
+    },
+  });
+  assert.ok(t.items[0]?.argText?.includes("b.txt"));
+  assert.match(t.items[0]?.html ?? "", /tool-args/);
+  assert.equal(t.items[0]?.elapsedMs, 1500);
+});

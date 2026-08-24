@@ -48,7 +48,7 @@ TUI 把 ACP `session/update` + `x.ai/session_notification` 收成 `RenderBlock`�
 | C-42 | Quote / 回复摘录 | 部分块带引用条。 | 同上。 | 是：blockquote 左边条 |
 | C-43 | Hook 注解 | `HookAnnotation` / `HookExecution` 挂在工具块上。 | 工具卡 footer「hook: pre/post」。 | 是 |
 | C-44 | ImageCompressed / Dropped | 通知：图被压缩或丢弃。 | toast + 时间线系统行。 | 是：丢弃进系统行；压缩静默 |
-| C-45 | Feedback 请求 | `FeedbackRequest` 启发式。 | 小调查卡。 | 是：时间线「有帮助 / 不太行」卡，提交 `x.ai/feedback`；回放不刷旧调查 |
+| C-45 | Feedback 请求 | `FeedbackRequest` 启发式。 | 小调查卡。 | 是：助手回复完成后气泡下方常驻「有帮助 / 没帮助」；没帮助再出「不准确 / 不完整 / 其他」；两下完成，提交 `x.ai/feedback`；replay 安静。调查卡仍可用 |
 | C-46 | Retry / AutoRecovery | `RetryState`、`AutoRecoveryStarted/Exhausted`。 | 状态条「正在重试 2/5」。 | 是（不进滚动区，避免刷屏；与 TUI 一样不写 session event） |
 | C-47 | Relay 同步状态 | `RelaySyncStatus`。 | 远程模式才显示。 | 是 |
 | C-48 | 模型切条 | 滚动区一条「Switched to X」。 | 系统行。 | 是：不刷系统行；自动切换用横幅（见 S-29） |

@@ -13,6 +13,7 @@ import {
   parseLocalSlash,
   parseThemeArg,
   planSlash,
+  skillUsedFromPrompt,
   slashBadgeLabel,
   slashKind,
   slashRunsOnAccept,
@@ -155,4 +156,11 @@ test("wired help lists built-ins we ship, not an external site", () => {
   assert.match(help, new RegExp(HELP_FOOTER));
   assert.match(help, /不是外站/);
   assert.doesNotMatch(help, /gboom/);
+});
+
+test("skillUsedFromPrompt only matches colon skill send", () => {
+  assert.equal(skillUsedFromPrompt("/bundled:imagine 用一句话总结这个 skill"), "bundled:imagine");
+  assert.equal(skillUsedFromPrompt("/imagine"), null);
+  assert.equal(skillUsedFromPrompt("imagine"), null);
+  assert.equal(skillUsedFromPrompt("/compact"), null);
 });

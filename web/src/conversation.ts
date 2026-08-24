@@ -79,6 +79,7 @@ export type TimelineItem = {
   elapsedMs?: number;
   startedAt?: number;
   argText?: string;
+  feedback?: "pending" | "reasons" | "sent";
 };
 
 export type ConversationEffect =
@@ -597,10 +598,45 @@ export class ConversationTimeline {
   }
 
   private finishTurn(): ConversationEffect[] {
+    if (!this.replayActive) {
+      for (let i = this.items.length - 1; i >= 0; i -= 1) {
+        const item = this.items[i]!;
+        if (item.kind === "agent" && !item.replay) {
+          if (!item.feedback) {
+            item.feedback = "pending";
+            this.mark(item);
+          }
+          break;
+        }
+      }
+    }
     this.liveAgentId = null;
     this.liveThinkId = null;
     this.collapseFinishedThinking();
     return [{ type: "prompt-complete" }, { type: "redraw" }];
+  }
+
+  noteSkillUsed(name: string) {
+    const skill = name.trim();
+    if (!skill) return;
+    const title = `使用了 skill ${skill}`;
+    const last = this.items.at(-1);
+    if (last?.kind === "tool" && last.title === title) return;
+    this.add({
+      id: nid("tool"),
+      kind: "tool",
+      who: "tool",
+      text: title,
+      html: `<div class="tool-skill">${escapePre(title)}</div>`,
+      eventId: null,
+      replay: false,
+      toolKind: "skill",
+      status: "completed",
+      title,
+      members: [{ family: "skill", title }],
+      timestamp: Date.now(),
+      raw: title,
+    });
   }
 
   private collapseFinishedThinking() {
@@ -713,7 +749,7 @@ export class ConversationTimeline {
             item.text = body;
             item.raw = body;
           }
-          item.source = update;
+          item.source = { ...(item.source ?? {}), ...update };
           item.path = pathFromUpdate(update) ?? item.path;
           item.html = formatToolHtml(item.toolKind ?? toolKind, item.text, update, {
             full: item.detailFull,

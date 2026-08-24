@@ -253,6 +253,9 @@ function fill(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
     });
     el.append(close);
   }
+  if (item.kind === "agent" && !item.replay && item.feedback) {
+    el.append(feedbackActions(item, handlers, () => fill(el, item, handlers)));
+  }
 }
 
 function fillUserThumbs(
@@ -466,30 +469,73 @@ function fillCompact(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers
 
 function fillFeedback(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
   el.onclick = () => handlers.onSelect(item);
-  const sent = item.status === "sent";
+  const sent = item.status === "sent" || item.feedback === "sent";
   el.dataset.sent = sent ? "1" : "0";
   const prompt = document.createElement("p");
   prompt.className = "feedback-prompt";
   prompt.textContent = sent ? "已记下，谢谢" : item.text || "这条回答有帮助吗？";
   el.append(prompt);
   if (sent || !handlers.onFeedback) return;
-  const row = document.createElement("div");
-  row.className = "feedback-actions";
-  const choices: [string, string][] = [
-    ["有帮助", "helpful"],
-    ["不太行", "not_helpful"],
-  ];
-  for (const [label, payload] of choices) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.textContent = label;
-    b.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      handlers.onFeedback?.(item, payload);
-    });
-    row.append(b);
+  if (!item.feedback) item.feedback = "pending";
+  el.append(feedbackActions(item, handlers, () => fill(el, item, handlers)));
+}
+
+function feedbackPill(label: string, selected = false): HTMLButtonElement {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = label;
+  if (selected) b.classList.add("is-selected");
+  return b;
+}
+
+function feedbackActions(
+  item: TimelineItem,
+  handlers: ItemHandlers,
+  rerender: () => void,
+): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "feedback-block";
+  const sent = item.feedback === "sent" || item.status === "sent";
+  if (sent) {
+    const thanks = document.createElement("p");
+    thanks.className = "feedback-prompt";
+    thanks.textContent = "已记下，谢谢";
+    wrap.append(thanks);
+    return wrap;
   }
-  el.append(row);
+  const top = document.createElement("div");
+  top.className = "feedback-actions";
+  const helpful = feedbackPill("有帮助");
+  const unhelpful = feedbackPill("没帮助", item.feedback === "reasons");
+  helpful.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    handlers.onFeedback?.(item, "helpful");
+  });
+  unhelpful.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    item.feedback = "reasons";
+    rerender();
+  });
+  top.append(helpful, unhelpful);
+  wrap.append(top);
+  if (item.feedback === "reasons") {
+    const reasons = document.createElement("div");
+    reasons.className = "feedback-actions";
+    for (const [label, payload] of [
+      ["不准确", "inaccurate"],
+      ["不完整", "incomplete"],
+      ["其他", "other"],
+    ] as const) {
+      const b = feedbackPill(label);
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        handlers.onFeedback?.(item, payload);
+      });
+      reasons.append(b);
+    }
+    wrap.append(reasons);
+  }
+  return wrap;
 }
 
 export async function enhanceMermaid(root: HTMLElement): Promise<void> {

@@ -1152,10 +1152,24 @@ button:disabled {
   color: var(--muted);
   font-size: 0.78em;
 }
+.tool-args-block {
+  margin: 0.35rem 0 0;
+}
+
+.tool-args-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin-bottom: 0.2rem;
+}
+
 .tool-args {
-  margin: 0.25rem 0 0;
+  margin: 0;
   white-space: pre-wrap;
   font-size: 0.82rem;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
 }
 .bubble.tool[data-family="skill"] {
   border: 0;
@@ -2699,25 +2713,48 @@ label.check input {
   color: var(--muted);
 }
 
+.feedback-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.bubble.agent > .feedback-block {
+  display: flex;
+}
+
 .feedback-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.4rem;
-  margin-top: 0.65rem;
+  margin-top: 0;
+}
+
+.bubble.feedback .feedback-actions {
+  margin-top: 0.35rem;
 }
 
 .feedback-actions button {
-  flex: 1;
+  flex: none;
   border: 1px solid var(--line);
-  background: var(--bg-3);
-  color: var(--ink);
-  border-radius: 8px;
-  padding: 0.4rem 0.55rem;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.18rem 0.7rem;
   font: inherit;
-  font-size: 0.86rem;
+  font-size: 0.8rem;
+}
+
+.feedback-actions button.is-selected {
+  background: #e8eeff;
+  border-color: #1f5eff;
+  color: #1f5eff;
 }
 
 .feedback-actions button:hover {
-  border-color: var(--accent);
+  border-color: #1f5eff;
 }
 
 #app:not([data-timestamps="1"]) .ts {

@@ -132,6 +132,7 @@ import {
   parseEffortArg,
   parseThemeArg,
   planSlash,
+  skillUsedFromPrompt,
   slashBadgeLabel,
   slashKind,
   slashRunsOnAccept,
@@ -1161,8 +1162,11 @@ const itemHandlers = {
     openBlockPreview(item);
   },
   onFeedback: (item: (typeof timeline.items)[number], text: string) => {
-    item.status = "sent";
-    item.text = "已记下，谢谢";
+    item.feedback = "sent";
+    if (item.kind === "feedback") {
+      item.status = "sent";
+      item.text = "已记下，谢谢";
+    }
     timeline.mark(item);
     syncThread();
     if (!sessionId) return;
@@ -3384,6 +3388,8 @@ async function sendPrompt(
     text,
     images.map((img) => ({ src: `data:${img.mimeType};base64,${img.data}`, alt: img.name })),
   );
+  const skill = skillUsedFromPrompt(text);
+  if (skill) timeline.noteSkillUsed(skill);
   syncThread();
   const el = timelineNodes.get(item.id);
   el?.scrollIntoView({ block: "start" });

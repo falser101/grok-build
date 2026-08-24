@@ -532,16 +532,20 @@ export function formatToolHtml(
   const title = str(update.title);
   const name = str(update.name);
   const family = toolFamily(kind, title, name);
+  const argsHtml =
+    family === "skill"
+      ? ""
+      : formatToolArgsHtml(resolveToolArgs(opts, update, body), Boolean(opts.streaming));
   const diff = extractDiff(update);
   if (diff && (diff.oldText || diff.newText)) {
-    return renderDiff(diff.path || pathFromUpdate(update) || "", diff.oldText, diff.newText);
+    return `${argsHtml}${renderDiff(diff.path || pathFromUpdate(update) || "", diff.oldText, diff.newText)}`;
   }
   const path = pathFromUpdate(update);
   if (family === "exec") {
     const cmd = commandFromUpdate(update);
     const cut = opts.full ? { text: body, omitted: 0, total: body.split("\n").length } : truncateLines(body, EXEC_FIRST, EXEC_LAST);
     const head = cmd ? `<div class="tool-cmd">$ ${escapePre(cmd)}</div>` : "";
-    return `${head}<pre class="tool-output">${ansiToHtml(cut.text)}</pre>${moreButton(cut.omitted, cut.total)}`;
+    return `${argsHtml}${head}<pre class="tool-output">${ansiToHtml(cut.text)}</pre>${moreButton(cut.omitted, cut.total)}`;
   }
   if (family === "skill") {
     const skill = name || shortToolLabel(title);
@@ -556,7 +560,7 @@ export function formatToolHtml(
       .filter(Boolean)
       .join(" ");
     const pre = shown ? `<pre class="tool-output">${shown}</pre>` : "";
-    return `${meta}${pre}${moreButton(cut.omitted, cut.total)}`;
+    return `${argsHtml}${meta}${pre}${moreButton(cut.omitted, cut.total)}`;
   }
   if (family === "search") {
     const query = queryFromUpdate(update);
@@ -570,13 +574,13 @@ export function formatToolHtml(
             `<li><a class="tool-path" href="#" data-path="${escapePre(h.path)}">${escapePre(h.path)}</a><span class="tool-line-no">:${h.line}</span> ${escapePre(h.text)}</li>`,
         )
         .join("");
-      return `${q}<ol class="search-hits">${items}</ol>`;
+      return `${argsHtml}${q}<ol class="search-hits">${items}</ol>`;
     }
-    return `${q}${pathLink(path)}<pre class="tool-output">${escapePre(body)}</pre>`;
+    return `${argsHtml}${q}${pathLink(path)}<pre class="tool-output">${escapePre(body)}</pre>`;
   }
   if (family === "list") {
     const cut = opts.full ? { text: body, omitted: 0, total: body.split("\n").length } : truncateLines(body, 12, 4);
-    return `${pathLink(path)}<pre class="tool-output tool-tree">${escapePre(cut.text)}</pre>${moreButton(cut.omitted, cut.total)}`;
+    return `${argsHtml}${pathLink(path)}<pre class="tool-output tool-tree">${escapePre(cut.text)}</pre>${moreButton(cut.omitted, cut.total)}`;
   }
   if (family === "websearch") {
     const query = queryFromUpdate(update) || title;
@@ -586,26 +590,30 @@ export function formatToolHtml(
       .join("");
     const list = links ? `<ul class="tool-cites">${links}</ul>` : "";
     const cut = opts.full ? { text: body, omitted: 0, total: 0 } : truncateLines(body, 8, 0);
-    return `<div class="tool-query">${escapePre(query)}</div>${list}<pre class="tool-output">${escapePre(cut.text)}</pre>`;
+    return `${argsHtml}<div class="tool-query">${escapePre(query)}</div>${list}<pre class="tool-output">${escapePre(cut.text)}</pre>`;
   }
   if (family === "fetch") {
     const url = urlFromUpdate(update) || path;
     const href = url && /^https?:/i.test(url) ? `<a href="${escapePre(url)}" target="_blank" rel="noreferrer">${escapePre(url)}</a>` : pathLink(url);
     const cut = opts.full ? { text: body, omitted: 0, total: body.split("\n").length } : truncateLines(body, 8, 3);
-    return `${href}<pre class="tool-output">${escapePre(cut.text)}</pre>${moreButton(cut.omitted, cut.total)}`;
+    return `${argsHtml}${href}<pre class="tool-output">${escapePre(cut.text)}</pre>${moreButton(cut.omitted, cut.total)}`;
   }
   if (family === "mcp") {
     const tool = name || shortToolLabel(title);
     const badge = `<span class="tool-badge">MCP</span> ${escapePre(tool)}`;
     const cut = opts.full ? { text: body, omitted: 0, total: body.split("\n").length } : truncateLines(body, 10, 3);
-    return `<div class="tool-mcp">${badge}</div><pre class="tool-output">${escapePre(cut.text)}</pre>${moreButton(cut.omitted, cut.total)}`;
+    return `${argsHtml}<div class="tool-mcp">${badge}</div><pre class="tool-output">${escapePre(cut.text)}</pre>${moreButton(cut.omitted, cut.total)}`;
   }
   const linked = pathLink(path);
   const cut = opts.full ? { text: body, omitted: 0, total: body.split("\n").length } : truncateLines(body, 10, 3);
-  const args = formatToolArgsHtml(opts.args ?? argSnapshot(update), Boolean(opts.streaming));
-  const echo = isGenericToolLabel(body) || body === title || body === name || body === kind;
+  const echo =
+    isGenericToolLabel(body) ||
+    body === title ||
+    body === name ||
+    body === kind ||
+    Boolean(argsHtml && looksLikeJson(body));
   const output = body && !echo ? `<pre class="tool-output">${escapePre(cut.text)}</pre>${moreButton(cut.omitted, cut.total)}` : "";
-  return `${args}${linked}${output}`;
+  return `${argsHtml}${linked}${output}`;
 }
 
 
@@ -691,23 +699,46 @@ export function argChunkFromUpdate(update: { [k: string]: Json }): string {
     if (typeof rec.text === "string" && (rec.type === "raw_input" || rec.type === "input")) return rec.text;
     if (typeof rec.json === "string") return rec.json;
   }
-  const raw = update.rawInput ?? update.raw_input;
-  if (typeof raw === "string") return raw;
-  if (raw && typeof raw === "object") return JSON.stringify(raw);
-  return "";
+  return argSnapshot(update);
 }
 
 function argSnapshot(update: { [k: string]: Json }): string {
-  const raw = update.rawInput ?? update.raw_input;
-  if (typeof raw === "string") return raw;
-  if (raw && typeof raw === "object") return JSON.stringify(raw);
+  for (const key of ["rawInput", "raw_input", "arguments", "input", "params"] as const) {
+    const raw = update[key];
+    if (typeof raw === "string" && raw.trim()) return raw;
+    if (raw && typeof raw === "object") return JSON.stringify(raw);
+  }
+  return "";
+}
+
+function looksLikeJson(text: string): boolean {
+  const t = text.trim();
+  if (!t || (t[0] !== "{" && t[0] !== "[")) return false;
+  try {
+    JSON.parse(t);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveToolArgs(
+  opts: { args?: string },
+  update: { [k: string]: Json },
+  body: string,
+): string {
+  const fromOpts = (opts.args ?? "").trim();
+  if (fromOpts) return fromOpts;
+  const snap = argSnapshot(update);
+  if (snap) return snap;
+  if (looksLikeJson(body)) return body;
   return "";
 }
 
 export function formatToolArgsHtml(args: string, streaming: boolean): string {
   if (!args) return "";
   const text = streaming ? `${args}|` : prettyToolArgs(args);
-  return `<pre class="tool-args">${escapePre(text)}</pre>`;
+  return `<div class="tool-args-block"><div class="tool-args-label">参数</div><pre class="tool-args">${escapePre(text)}</pre></div>`;
 }
 
 export function elapsedFromUpdate(update: { [k: string]: Json }): number | null {

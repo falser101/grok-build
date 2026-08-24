@@ -130,7 +130,7 @@ function fill(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
   if (item.kind === "think") {
     const details = el as HTMLDetailsElement;
     const sum = document.createElement("summary");
-    sum.textContent = "Thinking";
+    sum.textContent = "思考中";
     const body = document.createElement("div");
     body.className = "body";
     applyMarkdownStream(body, item.text);

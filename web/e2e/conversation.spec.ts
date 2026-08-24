@@ -289,16 +289,21 @@ test("header context chip shows percent from session_status", async ({ page }) =
 
 test("turn_completed clears thinking status and stop button", async ({ page }) => {
   await page.goto("/?noconnect=1");
-  await page.evaluate(() => window.__grokWebTest?.setTurnRunning(true));
-  await expect(page.locator("#turn-status")).toHaveText("正在想");
-  await expect(page.locator("#turn-actions")).toBeVisible();
-  await expect(page.locator("#btn-interject")).toBeVisible();
+  await page.evaluate(() => {
+    window.__grokWebTest?.insertUser("hi");
+    window.__grokWebTest?.setTurnRunning(true);
+  });
+  await expect(page.locator("#live-wait")).toBeVisible();
+  await expect(page.locator("#live-wait")).toContainText("思考中");
+  await expect(page.locator("#turn-actions")).toBeHidden();
+  await expect(page.locator("#hint")).not.toContainText("正在想");
   await expect(page.locator("#btn-stop")).toBeVisible();
   await page.evaluate(() => {
     window.__grokWebTest?.applyUpdate("session/update", {
       update: { sessionUpdate: "turn_completed", prompt_id: "p-done", stop_reason: "end_turn" },
     });
   });
+  await expect(page.locator("#live-wait")).toBeHidden();
   await expect(page.locator("#turn-status")).toBeHidden();
   await expect(page.locator("#turn-actions")).toBeHidden();
   await expect(page.locator("#btn-stop")).toBeHidden();
@@ -986,9 +991,31 @@ test("during a turn send stays for queue and send-now appears", async ({ page })
   await expect(page.locator("#btn-send")).toBeVisible();
   await expect(page.locator("#btn-send")).toHaveAttribute("aria-label", "加入队列");
   await expect(page.locator("#btn-stop")).toBeVisible();
+  await expect(page.locator("#turn-actions")).toBeHidden();
+  await page.evaluate(() => window.__grokWebTest?.enqueue("follow-up"));
   await expect(page.locator("#turn-actions")).toBeVisible();
   await expect(page.locator("#turn-actions #btn-send-now")).toBeVisible();
   await expect(page.locator("#turn-actions #btn-interject")).toBeVisible();
+});
+
+test("thinking placeholder hides once a thought arrives", async ({ page }) => {
+  await page.goto("/?noconnect=1");
+  await page.evaluate(() => {
+    window.__grokWebTest?.insertUser("hi");
+    window.__grokWebTest?.setTurnRunning(true);
+  });
+  await expect(page.locator("#live-wait")).toBeVisible();
+  await page.evaluate(() => {
+    window.__grokWebTest?.applyUpdate("session/update", {
+      update: {
+        sessionUpdate: "agent_thought_chunk",
+        content: { type: "text", text: "plan" },
+      },
+      _meta: { eventId: "th-live" },
+    });
+  });
+  await expect(page.locator("#live-wait")).toBeHidden();
+  await expect(page.locator(".bubble.think summary")).toHaveText("思考中");
 });
 
 test("composer docks to the bottom after history or a user bubble", async ({ page }) => {

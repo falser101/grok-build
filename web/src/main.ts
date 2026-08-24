@@ -272,6 +272,7 @@ const btnEffortChip = $<HTMLButtonElement>("btn-effort-chip");
 const composerMenu = $("composer-menu");
 const promptEl = $<HTMLTextAreaElement>("prompt");
 const thread = $<HTMLElement>("thread");
+const liveWaitEl = $("live-wait");
 const banner = $<HTMLElement>("banner");
 const warningsEl = $("startup-warnings");
 const connDot = $("conn-dot");
@@ -1240,6 +1241,7 @@ function syncThread() {
     attachHelpCard();
     btnFollow.hidden = true;
     threadRail.hidden = true;
+    liveWaitEl.hidden = true;
     return;
   }
   thread.querySelector(".empty")?.remove();
@@ -1274,6 +1276,45 @@ function syncThread() {
   else void enhanceMermaid(thread);
   attachHelpCard();
   updateComposerDock();
+  for (const item of timeline.items) {
+    const el = timelineNodes.get(item.id);
+    if (!el) continue;
+    el.classList.toggle(
+      "is-live",
+      item.id === timeline.liveThinkId || item.id === timeline.liveAgentId,
+    );
+  }
+  if (!thread.contains(liveWaitEl)) thread.append(liveWaitEl);
+  else thread.append(liveWaitEl);
+  syncLiveWait();
+}
+
+function currentTurnHasReply(): boolean {
+  let lastUser = -1;
+  for (let i = 0; i < timeline.items.length; i += 1) {
+    if (timeline.items[i]?.kind === "user") lastUser = i;
+  }
+  const rest = lastUser >= 0 ? timeline.items.slice(lastUser + 1) : timeline.items;
+  return rest.some((item) =>
+    item.kind === "think" ||
+    item.kind === "agent" ||
+    item.kind === "tool" ||
+    item.kind === "compact" ||
+    item.kind === "workflow" ||
+    item.kind === "subagent",
+  );
+}
+
+function syncLiveWait() {
+  const show = Boolean(
+    turnRunning &&
+      !blockHost.busy &&
+      app.dataset.surface === "session" &&
+      !timeline.replayActive &&
+      !currentTurnHasReply(),
+  );
+  liveWaitEl.hidden = !show;
+  if (show && liveWaitEl.parentElement !== thread) thread.append(liveWaitEl);
 }
 
 function scheduleMermaid() {
@@ -1444,15 +1485,12 @@ function persistFields() {
 
 function syncTurnButtons() {
   btnStop.hidden = !turnRunning;
-  turnActionsEl.hidden = !turnRunning;
+  turnActionsEl.hidden = !(turnRunning && localQueue.length > 0);
   btnSend.hidden = false;
   btnSend.setAttribute("aria-label", turnRunning ? "加入队列" : "发送");
   btnSend.title = turnRunning ? "加入队列，当前回复结束后再发（Enter）" : "发送";
-  if (turnRunning) {
-    hint.textContent = composerPrefs.enterSends
-      ? "正在生成 · Enter 入队 · Ctrl+Enter 立即发送"
-      : "正在生成 · 点发送入队 · Ctrl+Enter 立即发送";
-  }
+  syncComposerHint();
+  syncLiveWait();
 }
 
 function syncComposerFilled() {
@@ -1837,6 +1875,7 @@ function syncTurnStatus() {
   turnStatusEl.textContent = turnStatusLabel(phase);
   turnStatusEl.dataset.phase = phase;
   turnStatusEl.hidden = phase === "idle";
+  syncLiveWait();
 }
 
 let sidebarStatusTimer = 0;
@@ -2028,6 +2067,7 @@ function renderQueue() {
     queueSelectedId = null;
     queuePinned = false;
     renderQueue();
+    syncTurnButtons();
   });
   head.append(title, clear);
   queueStrip.append(head);
@@ -2036,6 +2076,7 @@ function renderQueue() {
     empty.className = "queue-empty";
     empty.textContent = "队列为空";
     queueStrip.append(empty);
+    syncTurnButtons();
     return;
   }
   if (!queueSelectedId || !localQueue.some((q) => q.id === queueSelectedId)) {
@@ -2081,6 +2122,7 @@ function renderQueue() {
     });
     queueStrip.append(row);
   }
+  syncTurnButtons();
 }
 
 function renderFollowUps(texts: string[]) {
@@ -4776,7 +4818,9 @@ function defaultComposerHint(): string {
 
 function syncComposerHint() {
   if (turnRunning) {
-    hint.textContent = turnStatusEl.textContent || "生成中";
+    hint.textContent = composerPrefs.enterSends
+      ? "Enter 加入待发 · Ctrl+Enter 立即发送"
+      : "点发送加入待发 · Ctrl+Enter 立即发送";
     return;
   }
   if (!slashMenu.hidden) {
@@ -5899,6 +5943,7 @@ declare global {
       timelineKinds: () => string[];
       queueTexts: () => string[];
       setTurnRunning: (value: boolean) => void;
+      enqueue: (text: string) => void;
       runLocalSlash: (name: string, args: string) => Promise<boolean>;
       insertContext: (text: string) => void;
       insertUser: (text: string) => void;
@@ -5950,6 +5995,10 @@ window.__grokWebTest = {
     turnRunning = value;
     syncTurnButtons();
     syncTurnStatus();
+  },
+  enqueue: (text) => {
+    localQueue = [...localQueue, { id: `q-${queueIdSeq++}`, text, images: [] }];
+    renderQueue();
   },
   runLocalSlash: (name, args) => runLocalSlash({ name, args }),
   insertContext: (text) => {

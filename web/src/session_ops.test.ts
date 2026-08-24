@@ -19,6 +19,7 @@ import {
   parseForkNewSessionId,
   parseResumeWorktreeResult,
   parseRewindPoints,
+  lastRewindPoint,
   parseSearchHits,
   parseSessionInfoFields,
   workspaceGroupKey,
@@ -239,6 +240,17 @@ test("rewind points accept camelCase and snake_case", () => {
   });
   assert.equal(pts[0]?.promptIndex, 2);
   assert.equal(pts[0]?.preview, "hello");
+});
+
+test("last rewind point is the newest promptIndex", () => {
+  assert.equal(lastRewindPoint([]), null);
+  const last = lastRewindPoint([
+    { promptIndex: 1, preview: "a" },
+    { promptIndex: 3, preview: "c" },
+    { promptIndex: 2, preview: "b" },
+  ]);
+  assert.equal(last?.promptIndex, 3);
+  assert.equal(last?.preview, "c");
 });
 
 test("context breakdown prefers a stacked bar over a single dump", () => {

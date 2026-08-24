@@ -148,6 +148,11 @@ export function parseRewindPoints(payload: Json): {
   return out;
 }
 
+export function lastRewindPoint<T extends { promptIndex: number }>(points: T[]): T | null {
+  if (!points.length) return null;
+  return points.reduce((best, row) => (row.promptIndex >= best.promptIndex ? row : best));
+}
+
 export function buildRewindExecuteParams(input: {
   sessionId: string;
   targetPromptIndex: number;

@@ -173,6 +173,7 @@ import {
   parseForkNewSessionId,
   parseResumeWorktreeResult,
   parseRewindPoints,
+  lastRewindPoint,
   parseSearchHits,
   parseSessionInfoFields,
   parseShareUrl,
@@ -4019,6 +4020,28 @@ async function showUsage(entry: SessionListEntry | null) {
   }
 }
 
+async function executeRewind(entry: SessionListEntry, targetPromptIndex: number) {
+  await acpCall(
+    "x.ai/rewind/execute",
+    buildRewindExecuteParams({
+      sessionId: entry.sessionId,
+      targetPromptIndex,
+    }),
+  );
+  await loadSession(entry.sessionId, { cwd: entry.cwd, reconnect: false });
+}
+
+async function rewindLastTurn(entry: SessionListEntry) {
+  const raw = await acpCall("x.ai/rewind/points", buildRewindPointsParams(entry.sessionId));
+  const point = lastRewindPoint(parseRewindPoints(raw));
+  if (!point) {
+    showBanner("没有可回退的 turn", "rewind");
+    return;
+  }
+  if (!window.confirm(`回退到 turn ${point.promptIndex}？`)) return;
+  await executeRewind(entry, point.promptIndex);
+}
+
 async function rewindSession(entry: SessionListEntry) {
   const raw = await acpCall("x.ai/rewind/points", buildRewindPointsParams(entry.sessionId));
   const points = parseRewindPoints(raw);
@@ -4034,14 +4057,7 @@ async function rewindSession(entry: SessionListEntry) {
       void (async () => {
         if (!window.confirm(`回退到 turn ${p.promptIndex}？`)) return;
         closeAction();
-        await acpCall(
-          "x.ai/rewind/execute",
-          buildRewindExecuteParams({
-            sessionId: entry.sessionId,
-            targetPromptIndex: p.promptIndex,
-          }),
-        );
-        await loadSession(entry.sessionId, { cwd: entry.cwd, reconnect: false });
+        await executeRewind(entry, p.promptIndex);
       })().catch((e) => showBanner(e instanceof Error ? e.message : String(e)));
     });
     return b;
@@ -4956,8 +4972,17 @@ function renderPicker() {
   syncComposerHint();
 }
 
+function openComposerModelMenu() {
+  const items = catalogModels.length
+    ? catalogModels.map((m) => ({ id: m.id, label: m.name, selected: m.id === currentModelId }))
+    : [{ id: currentModelId || "current", label: currentModelName || "当前模型", selected: true }];
+  openComposerMenu(btnModelChip, items, (id) => {
+    void setSessionModel(id);
+  });
+}
+
 function openModelPicker() {
-  void openHeaderModelMenu();
+  openComposerModelMenu();
 }
 
 async function refreshContextChip(id: string) {
@@ -5546,12 +5571,7 @@ btnPermissionChip.addEventListener("click", () => {
   );
 });
 btnModelChip.addEventListener("click", () => {
-  const items = catalogModels.length
-    ? catalogModels.map((m) => ({ id: m.id, label: m.name, selected: m.id === currentModelId }))
-    : [{ id: currentModelId || "current", label: currentModelName || "当前模型", selected: true }];
-  openComposerMenu(btnModelChip, items, (id) => {
-    void setSessionModel(id);
-  });
+  openComposerModelMenu();
 });
 btnEffortChip.addEventListener("click", () => {
   openComposerMenu(
@@ -5683,7 +5703,7 @@ function firstEscOverlay(): string | null {
     find: !findBar.hidden,
     jump: !jumpPanel.hidden,
     help: !helpCard.hidden,
-    slash: slashPopoverOpen() || !atMenu.hidden,
+    slash: slashPopoverOpen() || !atMenu.hidden || !composerMenu.hidden,
     history: !promptHistoryEl.hidden,
     sessionPopover: !sessionPopover.hidden,
     btw: Boolean(timeline.items.find((it) => it.kind === "btw" && it.open !== false)),
@@ -5706,6 +5726,7 @@ function closeEscOverlay(id: string) {
   else if (id === "help") closeHelpCard();
   else if (id === "slash") {
     closeSlashPicker(true);
+    closeComposerMenu();
     hidePopovers();
   } else if (id === "history") {
     hidePopovers();
@@ -5793,7 +5814,7 @@ document.addEventListener(
       lastEscArm = null;
       hideEscHint();
       const entry = currentEntry();
-      if (entry) void rewindSession(entry);
+      if (entry) void rewindLastTurn(entry).catch((e) => showBanner(e instanceof Error ? e.message : String(e)));
     }
   },
   true,

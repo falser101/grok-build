@@ -1807,6 +1807,34 @@ code {
   color: var(--ok);
 }
 
+#billing-chip {
+  margin-top: 0.12rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+#billing-chip:hover {
+  color: var(--accent);
+}
+
+#billing-chip[data-hot="1"] {
+  color: var(--edit);
+}
+
+.sheet-section {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
 #version-badge {
   max-width: 28ch;
   overflow: hidden;

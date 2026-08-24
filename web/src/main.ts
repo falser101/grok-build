@@ -176,6 +176,13 @@ import {
   parseWorktreePath,
 } from "./session_ops";
 import {
+  billingChipText,
+  billingIsLow,
+  formatPrepaidDollars,
+  parseBilling,
+  type BillingSnapshot,
+} from "./billing";
+import {
   DASH_COLLAPSE_KEY,
   DASH_GROUP_LABEL,
   DASH_HELP_SHORTCUTS,
@@ -333,6 +340,7 @@ const welcomeCwd = $("welcome-cwd");
 const welcomeVersion = $("welcome-version");
 const versionBadge = $("version-badge");
 const planBadge = $("plan-badge");
+const billingChip = $<HTMLButtonElement>("billing-chip");
 const consentBanner = $("consent-banner");
 const paywallEl = $("paywall");
 const paywallCopy = $("paywall-copy");
@@ -399,6 +407,7 @@ let snapshot: InitializeSnapshot | null = null;
 let authMethods: AuthMethodInfo[] = [];
 let authDecision: StartupAuthDecision | null = null;
 let paywall: PaywallInfo | null = null;
+let lastBilling: BillingSnapshot | null = null;
 let recentSessions: SessionListEntry[] = [];
 /** Unfiltered `x.ai/session/list` pages. Visibility is applied in `applyPickerList`. */
 let listedSessionsRaw: SessionListEntry[] = [];
@@ -2164,6 +2173,7 @@ async function afterAuthenticated(authMeta: Json | null, resume = false) {
   } catch {
     /* optional */
   }
+  void refreshBilling();
   applyComposerGate();
   if (resume) {
     await refreshSessions();
@@ -2505,6 +2515,32 @@ function renderSessionList(): void {
       saveCollapsedWorkspaces(next);
     });
     sessionListEl.append(details);
+  }
+}
+
+function applyBilling(raw: Json) {
+  const snap = parseBilling(raw);
+  lastBilling = snap;
+  if (!snap) {
+    billingChip.hidden = true;
+    return;
+  }
+  billingChip.hidden = false;
+  billingChip.textContent = billingChipText(snap);
+  billingChip.dataset.hot = billingIsLow(snap) ? "1" : "0";
+  billingChip.title = `${snap.periodLabel} · 已用 ${Math.floor(snap.usedPercent)}%`;
+  if (snap.subscriptionTier) {
+    planBadge.hidden = false;
+    planBadge.textContent = snap.subscriptionTier;
+  }
+}
+
+async function refreshBilling() {
+  if (!acp.connected || !authenticated) return;
+  try {
+    applyBilling(extResultPayload(await acpCall("x.ai/billing", {})));
+  } catch {
+    /* optional: API key / team accounts may have no consumer billing */
   }
 }
 
@@ -3235,11 +3271,7 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
     return true;
   }
   if (name === "usage") {
-    if (!entry) {
-      showBanner("打开一场会话后再看用量", "usage");
-      return true;
-    }
-    await showContext(entry);
+    await showUsage(entry);
     return true;
   }
   if (name === "privacy") {
@@ -3598,11 +3630,85 @@ function sheetFoot(primary: string, onPrimary: () => void, opts?: { danger?: boo
   return foot;
 }
 
-function openUsageSheet(raw: Json, entry: SessionListEntry) {
-  const b = parseContextBreakdown(raw);
+function appendBillingSection(stack: HTMLElement) {
+  if (!lastBilling) return;
+  const snap = lastBilling;
+  const h = document.createElement("p");
+  h.className = "sheet-section";
+  h.textContent = snap.subscriptionTier
+    ? `${snap.periodLabel} · ${snap.subscriptionTier}`
+    : snap.periodLabel;
+  stack.append(h);
+  stack.append(sheetCopy("这是账号额度。下面那场对话用了多少字，是另一回事。"));
+  const hero = document.createElement("div");
+  hero.className = "sheet-hero";
+  const pct = document.createElement("strong");
+  pct.textContent = `${snap.remainingPercent}%`;
+  const sub = document.createElement("span");
+  sub.textContent = "还剩";
+  hero.append(pct, sub);
+  stack.append(hero);
+  const bar = document.createElement("div");
+  bar.className = "usage-bar";
+  bar.setAttribute("role", "img");
+  bar.setAttribute("aria-label", snap.periodLabel);
+  const used = document.createElement("span");
+  used.dataset.key = "used";
+  used.style.flex = String(Math.max(snap.usedPercent, 0.5));
+  const free = document.createElement("span");
+  free.dataset.key = "free";
+  free.style.flex = String(Math.max(snap.remainingPercent, 0.5));
+  bar.append(used, free);
+  stack.append(bar);
+  const rows = document.createElement("div");
+  rows.className = "usage-rows";
+  const usedRow = document.createElement("div");
+  usedRow.className = "usage-row";
+  usedRow.append("已用", Object.assign(document.createElement("span"), {
+    className: "muted",
+    textContent: `${Math.floor(snap.usedPercent)}%`,
+  }));
+  rows.append(usedRow);
+  if (snap.resetLabel) {
+    const reset = document.createElement("div");
+    reset.className = "usage-row";
+    reset.append("重置", Object.assign(document.createElement("span"), {
+      className: "muted",
+      textContent: snap.resetLabel,
+    }));
+    rows.append(reset);
+  }
+  if (snap.prepaidDollars != null) {
+    const pre = document.createElement("div");
+    pre.className = "usage-row";
+    pre.append(
+      "已购额度",
+      Object.assign(document.createElement("span"), {
+        className: "muted",
+        textContent: formatPrepaidDollars(Math.round(snap.prepaidDollars * 100)),
+      }),
+    );
+    rows.append(pre);
+  }
+  stack.append(rows);
+}
+
+function openUsageSheet(raw: Json | null, entry: SessionListEntry | null) {
   appDialogBody.replaceChildren();
   const stack = document.createElement("div");
   stack.className = "sheet-stack";
+  appendBillingSection(stack);
+  if (!raw) {
+    if (!lastBilling) stack.append(sheetCopy("暂时拿不到额度数字。登录 grok.com 账号后会出现。"));
+    appDialogBody.append(stack);
+    showAppDialog("账户额度", "sheet");
+    return;
+  }
+  const b = parseContextBreakdown(raw);
+  const ctxHead = document.createElement("p");
+  ctxHead.className = "sheet-section";
+  ctxHead.textContent = "这场对话";
+  stack.append(ctxHead);
   stack.append(
     sheetCopy("模型一次能记住的内容有限。满了以后，较早的对话会被收成摘要。"),
   );
@@ -3613,7 +3719,7 @@ function openUsageSheet(raw: Json, entry: SessionListEntry) {
   const sub = document.createElement("span");
   sub.textContent =
     b.used != null && b.total != null
-      ? `${formatTokenCount(b.used)} / ${formatTokenCount(b.total)}`
+      ? `已用 · ${formatTokenCount(b.used)} / ${formatTokenCount(b.total)}`
       : "还没有用量数字";
   hero.append(pct, sub);
   stack.append(hero);
@@ -3674,7 +3780,7 @@ function openUsageSheet(raw: Json, entry: SessionListEntry) {
     stack.append(extra);
   }
   const threshold = b.autoCompactAt ?? 85;
-  if (b.percent != null && b.percent >= Math.max(60, threshold - 15)) {
+  if (entry && b.percent != null && b.percent >= Math.max(60, threshold - 15)) {
     stack.append(sheetCopy(`接近上限（约 ${threshold}% 会自动压缩）。也可以现在压缩较早对话。`));
     const go = document.createElement("button");
     go.type = "button";
@@ -3687,7 +3793,7 @@ function openUsageSheet(raw: Json, entry: SessionListEntry) {
     stack.append(go);
   }
   appDialogBody.append(stack);
-  showAppDialog("这次对话用了多少", "sheet");
+  showAppDialog(lastBilling ? "用量" : "这次对话用了多少", "sheet");
 }
 
 function openInfoSheet(raw: Json) {
@@ -3793,10 +3899,25 @@ async function showInfo(entry: SessionListEntry) {
 }
 
 async function showContext(entry: SessionListEntry) {
-  const info = extResultPayload(await acpCall("x.ai/session/info", buildSessionInfoParams(entry.sessionId)));
-  applyModelState(info);
-  applyContextUsage(info);
-  openUsageSheet(info, entry);
+  await showUsage(entry);
+}
+
+async function showUsage(entry: SessionListEntry | null) {
+  await refreshBilling();
+  if (!entry) {
+    openUsageSheet(null, null);
+    return;
+  }
+  try {
+    const info = extResultPayload(
+      await acpCall("x.ai/session/info", buildSessionInfoParams(entry.sessionId)),
+    );
+    applyModelState(info);
+    applyContextUsage(info);
+    openUsageSheet(info, entry);
+  } catch {
+    openUsageSheet(null, entry);
+  }
 }
 
 async function rewindSession(entry: SessionListEntry) {
@@ -3976,6 +4097,8 @@ async function logout(opts: { acp: boolean }): Promise<void> {
   authenticated = false;
   paywallBlocked = false;
   paywallEl.hidden = true;
+  lastBilling = null;
+  billingChip.hidden = true;
   consentBanner.hidden = true;
   clearSessionView();
   renderLogin();
@@ -4367,6 +4490,11 @@ async function acceptPalette(item: PaletteItem) {
   if (!handled) await sendPrompt(`/${cmd.name}`);
 }
 
+billingChip.addEventListener("click", () => {
+  void showUsage(currentEntry()).catch((e) =>
+    showBanner(e instanceof Error ? e.message : String(e)),
+  );
+});
 btnSettings.addEventListener("click", () => openSettings());
 btnSettingsClose.addEventListener("click", () => closeSettings());
 $("btn-app-dialog-close").addEventListener("click", () => closeAppDialog());
@@ -5783,6 +5911,7 @@ declare global {
       openExportSheet: () => void;
       openCompactSheet: () => void;
       openUsageSheet: () => void;
+      applyBilling: (payload: Json) => void;
     };
   }
 }
@@ -5872,6 +6001,9 @@ window.__grokWebTest = {
       sourceWorkspaceDir: null,
       repoName: null,
     });
+  },
+  applyBilling: (payload) => {
+    applyBilling(payload);
   },
   openUsageSheet: () => {
     openUsageSheet(

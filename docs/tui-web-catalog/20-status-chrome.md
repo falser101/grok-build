@@ -5,7 +5,7 @@
 | H-01 | Shortcuts bar | U-04 | 底 hint | 是：底 hint / `?` |
 | H-02 | Status bar chips | 模型、effort、YOLO、plan、mode | 顶栏 | 是：模型/effort/模式在输入框，不在顶栏 |
 | H-03 | Context bar | 占用 % | 顶栏；amber 在 compact 阈值或 80% | 是：用量弹层；顶栏不画 |
-| H-04 | Credit bar | 额度 | 同 | 否。**备注：额度条 待讨论后再做。** |
+| H-04 | Credit bar | 额度 | 同 | 是：不在顶栏（输入框已有模型）；侧栏账户区「还剩 N%」，点开看本周/本月额度 |
 | H-05 | Turn status | 与 prompt 间距 | 「正在跑」 | 是：正在想 / 跑工具 / Stop |
 | H-06 | Watching 行 | 后台仍活 | 「1 monitor · 2 loops」 | 否。**备注：watching 行 待讨论后再做。** |
 | H-07 | Status line 关 | `[ui.status_line] type=disabled` 默认 | 默认不画 | 是：默认不画 TUI status line |

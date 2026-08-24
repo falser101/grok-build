@@ -218,6 +218,27 @@ test("session overflow menu sits next to the title", async ({ page }) => {
   await expect(page.locator("#btn-worktree-resume")).toHaveText("在独立副本打开");
 });
 
+test("sidebar shows remaining credits from billing", async ({ page }) => {
+  await page.goto("/?noconnect=1");
+  await expect(page.locator("#billing-chip")).toBeHidden();
+  await page.evaluate(() => {
+    window.__grokWebTest?.applyBilling({
+      config: {
+        creditUsagePercent: 42,
+        currentPeriod: { type: "USAGE_PERIOD_TYPE_WEEKLY", end: "2026-03-31T12:00:00Z" },
+      },
+      subscriptionTier: "SuperGrok",
+    });
+  });
+  await expect(page.locator("#billing-chip")).toHaveText("还剩 58%");
+  await expect(page.locator("#plan-badge")).toHaveText("SuperGrok");
+  await page.locator("#billing-chip").click();
+  await expect(page.locator("#app-dialog-title")).toHaveText("账户额度");
+  await expect(page.locator("#app-dialog")).toContainText("本周额度");
+  await expect(page.locator("#app-dialog")).toContainText("58%");
+  await expect(page.locator("#app-dialog")).toContainText("已用");
+});
+
 test("usage export and compact sheets are readable", async ({ page }) => {
   await page.goto("/?noconnect=1");
   await page.evaluate(() => window.__grokWebTest?.openUsageSheet());

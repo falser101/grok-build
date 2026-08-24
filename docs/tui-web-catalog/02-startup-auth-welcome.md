@@ -11,7 +11,7 @@
 | A-07 | `/login` `/logout` | 会话内重登；logout 回登录屏。 | 登录页 + 设置里退出。logout 后清前端 session 视图，WS 可保持，再 authenticate。 | 是 |
 | A-08 | 设备码 / 浏览器登录 | Welcome 可出按钮；Command 模式自动开浏览器。 | `window.open` 授权 URL；轮询或用户贴 code。不要在 Web 里嵌无第三方 cookie 的完整 OAuth 除非用同样 ACP 扩展。 | 部分：已发 `_x.ai/auth/get_url`、可贴授权码、可取消。**备注：完整 IdP 轮询待真账号走一遍。** |
 | A-09 | API key 登录 | 粘贴 `xai-...`。 | 密码框 + authenticate params。不要存到 localStorage 明文；本机 Web 让 Agent 写 `~/.grok/auth.json`。 | 是 |
-| A-10 | 订阅 / 付费墙 | `CheckSubscription`、`OpenSupergrokUrl`、credit limit 块、`SchedulePaywallCheck`。滚动区 `CreditLimitBlock`。 | 额度用尽画卡片 + 链到 grok.com。听 session 通知/usage 扩展。 | 部分：登录后 check_subscription + 额度卡。**备注：无额度用尽样本。** |
+| A-10 | 订阅 / 付费墙 | `CheckSubscription`、`OpenSupergrokUrl`、credit limit 块、`SchedulePaywallCheck`。滚动区 `CreditLimitBlock`。 | 额度用尽画卡片 + 链到 grok.com。听 session 通知/usage 扩展。 | 是：登录后 `x.ai/billing`；侧栏「还剩 N%」（点开用量弹层）；额度用尽仍走付费墙卡 |
 | A-11 | 文件夹信任 | 首次在某 cwd 跑会问 trust。`TrustState`。hooks 另有 project trust。 | 本机 Web 的 cwd 由 `session/new` 传入。若 Agent 回信任请求，做确认对话框。不要默认 YOLO。 | 部分：信任对话框已接、默认 reject。**备注：无 `folder_trust/request` 样本。** |
 | A-12 | Consent / 隐私横幅 | Welcome `consent.rs`；`/privacy` 打开 coding data 选择。ZDR/admin 托管时行不可改。 | 首次显示同意；设置里 Opt in/out。调 `x.ai` privacy 扩展（TUI `/privacy`）。 | 是 |
 | A-13 | Welcome 布局 | 顶栏 repo:branch + 版本；居中 logo（shimmer）；菜单；底部 prompt。边距保留。 | 落地页：产品名、cwd、最近 session 列表、主输入。Logo 可用 SVG，不必 ASCII。 | 部分：落地页有产品名/cwd/版本/主输入/继续上次。**备注：Welcome 内再嵌一份最近列表待讨论（侧栏已有）。** |

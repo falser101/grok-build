@@ -30,7 +30,7 @@
 | U-24 | Extensions modal | hooks/plugins/marketplace/skills 四 tab；非 VS Code `Ctrl+L` | 四 tab 页。VS Code 家族 TUI 把 Ctrl+L 给了 interject | 部分：slash 入口提示不做。**备注：四 tab 扩展页见 15。** |
 | U-25 | MCP modal | `/mcps` | 见 E | 部分：slash 入口提示不做。**备注：见 15。** |
 | U-26 | Memory modal | `/memory` 浏览文件 | 文件列表+内容 | 否。**备注：记忆文件浏览 待讨论后再做。** |
-| U-27 | Usage modal | `/usage` | 额度/账单 | 是：`/usage` 用量弹层（额度账单另议） |
+| U-27 | Usage modal | `/usage` | 额度/账单 | 是：`/usage` 弹层含账户额度（还剩 %）+ 这场对话 token |
 | U-28 | Privacy | `/privacy` | A-12 | 是：设置里隐私开关 + `/privacy` |
 | U-29 | Import Claude modal | 权限/env/MCP/hooks/paths 多选确认 | 向导 | 否。**备注：导入 Claude 向导 待讨论后再做。** |
 | U-30 | New worktree dialog | label、ref | 对话框 | 是：独立副本对话框（S-17） |
@@ -46,7 +46,7 @@
 | U-40 | Prompt suggestion | I-13 | 同 | 是：幽灵字（I-13） |
 | U-41 | Suggestion controller | 补全状态机 | 同 | 是：slash/@/suggest 状态机 |
 | U-42 | Context bar | 上下文占用 | 顶栏百分比 | 是：用量弹层（顶栏不画） |
-| U-43 | Credit bar | 额度 | 顶栏 | 否。**备注：额度条 待讨论后再做。** |
+| U-43 | Credit bar | 额度 | 顶栏 | 是：侧栏账户区，不进顶栏 |
 | U-44 | Status bar | 模型、mode、YOLO 芯片、plan 芯片 | 顶栏 chips | 是：输入框模型/effort/模式芯片 |
 | U-45 | Session title | 标题组件 | 顶栏 | 是 |
 | U-46 | Privacy banner | 未同意时 | 横幅 | 是：同意横幅 |

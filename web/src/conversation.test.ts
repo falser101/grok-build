@@ -608,6 +608,25 @@ test("model switch does not clutter the timeline", () => {
   assert.equal(t.items.length, 0);
 });
 
+test("live feedback_request becomes a card; replay does not", () => {
+  const t = new ConversationTimeline();
+  t.apply("session/update", {
+    update: {
+      sessionUpdate: "feedback_request",
+      content: { type: "text", text: "这条回答有帮助吗？" },
+      requestId: "fb-1",
+    },
+  });
+  assert.equal(t.items[0]?.kind, "feedback");
+  assert.equal(t.items[0]?.status, "pending");
+  assert.equal(t.items[0]?.source?.requestId, "fb-1");
+  t.apply("session/update", {
+    update: { sessionUpdate: "feedback_request", content: { text: "old" } },
+    _meta: { isReplay: true },
+  });
+  assert.equal(t.items.filter((it) => it.kind === "feedback").length, 1);
+});
+
 test("context btw jump copy and find helpers", () => {
   const t = new ConversationTimeline();
   t.insertUser("q1");

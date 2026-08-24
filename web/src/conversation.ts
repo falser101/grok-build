@@ -322,7 +322,14 @@ export class ConversationTimeline {
       return [];
     }
     if (kind === "feedback_request") {
+      if (replay) return [];
       const text = textFromContent(update.content) || "这条回答有帮助吗？";
+      const requestId =
+        (typeof update.requestId === "string" && update.requestId) ||
+        (typeof update.request_id === "string" && update.request_id) ||
+        (typeof rec?.requestId === "string" && rec.requestId) ||
+        (typeof rec?.request_id === "string" && rec.request_id) ||
+        null;
       this.add({
         id: nid("feedback"),
         kind: "feedback",
@@ -333,6 +340,8 @@ export class ConversationTimeline {
         replay,
         timestamp: Date.now(),
         raw: text,
+        status: "pending",
+        source: requestId ? { requestId } : undefined,
       });
       return [{ type: "redraw" }];
     }

@@ -1150,6 +1150,19 @@ const itemHandlers = {
   onView: (item: (typeof timeline.items)[number]) => {
     openBlockPreview(item);
   },
+  onFeedback: (item: (typeof timeline.items)[number], text: string) => {
+    item.status = "sent";
+    item.text = "已记下，谢谢";
+    timeline.mark(item);
+    syncThread();
+    if (!sessionId) return;
+    const params: { [k: string]: Json } = { sessionId, feedbackText: text };
+    const requestId = item.source?.requestId;
+    if (typeof requestId === "string" && requestId) params.requestId = requestId;
+    acp.request("x.ai/feedback", params).catch(() => {
+      showBanner("反馈没发出去", "feedback");
+    });
+  },
   onSelect: (item: (typeof timeline.items)[number]) => {
     timeline.select(item.id);
     syncThread();

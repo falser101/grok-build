@@ -675,6 +675,23 @@ test("session/prompt content blocks include text; Ctrl+Enter is send-now", async
   expect(msg?.params?._meta?.screenMode).toBe("web");
 });
 
+test("feedback request card can be answered in the thread", async ({ page }) => {
+  await page.goto("/?noconnect=1");
+  await page.evaluate(() => {
+    window.__grokWebTest?.applyUpdate("session/update", {
+      update: {
+        sessionUpdate: "feedback_request",
+        content: { type: "text", text: "这条回答有帮助吗？" },
+      },
+    });
+  });
+  const card = page.locator(".bubble.feedback");
+  await expect(card).toContainText("这条回答有帮助吗？");
+  await card.getByRole("button", { name: "有帮助" }).click();
+  await expect(card).toContainText("已记下，谢谢");
+  await expect(card.getByRole("button")).toHaveCount(0);
+});
+
 test("local /copy /find /jump /context and mermaid/btw blocks", async ({ page }) => {
   await page.goto("/?noconnect=1");
   await page.evaluate(() => {

@@ -20,6 +20,7 @@ export type ItemHandlers = {
   onOpenImage?: (gallery: { src: string; alt: string }[], index: number) => void;
   onOpenPath?: (path: string) => void;
   onExpandTool?: (item: TimelineItem) => void;
+  onFeedback?: (item: TimelineItem, text: string) => void;
 };
 
 export const USER_THUMB_CAP = 4;
@@ -155,6 +156,10 @@ function fill(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
   }
   if (item.kind === "compact") {
     fillCompact(el, item, handlers);
+    return;
+  }
+  if (item.kind === "feedback") {
+    fillFeedback(el, item, handlers);
     return;
   }
   const who = document.createElement("span");
@@ -457,6 +462,34 @@ function fillCompact(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers
     copy.append(track);
   }
   el.append(mark, copy);
+}
+
+function fillFeedback(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
+  el.onclick = () => handlers.onSelect(item);
+  const sent = item.status === "sent";
+  el.dataset.sent = sent ? "1" : "0";
+  const prompt = document.createElement("p");
+  prompt.className = "feedback-prompt";
+  prompt.textContent = sent ? "已记下，谢谢" : item.text || "这条回答有帮助吗？";
+  el.append(prompt);
+  if (sent || !handlers.onFeedback) return;
+  const row = document.createElement("div");
+  row.className = "feedback-actions";
+  const choices: [string, string][] = [
+    ["有帮助", "helpful"],
+    ["不太行", "not_helpful"],
+  ];
+  for (const [label, payload] of choices) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    b.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      handlers.onFeedback?.(item, payload);
+    });
+    row.append(b);
+  }
+  el.append(row);
 }
 
 export async function enhanceMermaid(root: HTMLElement): Promise<void> {

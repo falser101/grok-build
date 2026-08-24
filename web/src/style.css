@@ -2586,12 +2586,50 @@ label.check input {
 }
 
 .bubble.workflow,
-.bubble.subagent,
-.bubble.feedback {
+.bubble.subagent {
   align-self: stretch;
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 0.55rem 0.75rem;
+}
+
+.bubble.feedback {
+  align-self: center;
+  width: min(22rem, 100%);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  background: var(--bg-2);
+}
+
+.feedback-prompt {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.bubble.feedback[data-sent="1"] .feedback-prompt {
+  color: var(--muted);
+}
+
+.feedback-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+
+.feedback-actions button {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--bg-3);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 0.4rem 0.55rem;
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.feedback-actions button:hover {
+  border-color: var(--accent);
 }
 
 #app:not([data-timestamps="1"]) .ts {

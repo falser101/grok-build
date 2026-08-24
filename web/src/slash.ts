@@ -335,7 +335,10 @@ export function nextThemePref(current: "auto" | "dark" | "light"): "auto" | "dar
 
 export function parseThemeArg(args: string): "auto" | "dark" | "light" | null {
   const v = args.trim().toLowerCase();
-  if (v === "auto" || v === "dark" || v === "light") return v;
+  if (!v) return null;
+  if (v === "auto" || v === "system" || v === "跟随系统" || v === "跟随" || v === "系统") return "auto";
+  if (v === "dark" || v === "深" || v === "深色") return "dark";
+  if (v === "light" || v === "浅" || v === "浅色") return "light";
   return null;
 }
 

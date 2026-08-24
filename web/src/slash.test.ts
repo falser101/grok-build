@@ -94,6 +94,10 @@ test("theme cycle, effort parse, compact mode persist", () => {
   assert.equal(nextThemePref("dark"), "light");
   assert.equal(nextThemePref("light"), "auto");
   assert.equal(parseThemeArg("Light"), "light");
+  assert.equal(parseThemeArg("深"), "dark");
+  assert.equal(parseThemeArg("浅"), "light");
+  assert.equal(parseThemeArg("跟随系统"), "auto");
+  assert.equal(parseThemeArg("dark"), "dark");
   assert.equal(parseThemeArg("nope"), null);
   assert.equal(parseEffortArg("xhigh"), "xhigh");
   assert.equal(parseEffortArg("max"), null);

@@ -3259,7 +3259,12 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
     return true;
   }
   if (name === "theme") {
-    const named = parseThemeArg(args);
+    const trimmed = args.trim();
+    const named = parseThemeArg(trimmed);
+    if (trimmed && !named) {
+      showBanner("外观：跟随系统 / 深 / 浅", "theme");
+      return true;
+    }
     const next = named ?? nextThemePref(themePref);
     applyThemeChoice(next, true);
     const labels = { auto: "跟随系统", dark: "深", light: "浅" } as const;

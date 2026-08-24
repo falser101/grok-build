@@ -7,13 +7,13 @@
 | ID | 功能点 | TUI | Web 怎么做 | Web 已实现 |
 |---|---|---|---|---|
 | B-01 | 权限请求 | ACP `session/request_permission`（及 xAI 包装）。选项：Allow once / Always this command / Always all sessions（开 YOLO）/ Reject。默认光标 `default_selected_permission`（默认 always_allow_all_sessions 那一行，不是 index 0）。确认后光标粘上次 kind。 | modal 必做。选项按 payload 渲染，不要写死四行。回 JSON-RPC **response**，否则 Agent 挂起。 | 是（输入框上方同栏卡片；选项来自 payload；回 selected/cancelled） |
-| B-02 | Always 范围左右键 | `←/→` 扩/缩 always 记忆范围。bash 可 `e` 手改 pattern。 | 「始终允许」下拉：精确命令 / 模式 / 本 session 全开。可编辑 glob。 | 部分：Always/Never 行 chip + ←/→ + `e` 自定义 glob，回 `_meta.command_parts`；现网 grok_web 的 `always-allow` 仍会记住整条命令，前缀只在 `allow-always-command` / `reject-always` 生效 |
+| B-02 | Always 范围左右键 | `←/→` 扩/缩 always 记忆范围。bash 可 `e` 手改 pattern。 | 「始终允许」下拉：精确命令 / 模式 / 本 session 全开。可编辑 glob。 | 部分：Always/Never chip + glob。**备注：现网 always-allow 仍记整条命令，前缀是否要跟 TUI 待讨论。** |
 | B-03 | 展开完整参数 | `Ctrl+F` 展开/折 tool args。 | 「显示完整命令」toggle。MCP args 有行数/列数截断（pager 常量）。 | 是（显示完整命令 / Ctrl+F） |
 | B-04 | 权限卡开 YOLO | `Ctrl+O`。 | 按钮「此后全部允许」= `/always-approve`。 | 是（按钮 + Ctrl+O + `x.ai/yolo_mode_changed`） |
 | B-05 | 权限卡 Esc | **不**回答、不 dismiss。焦点停到滚动区，Tab 回来。 | Esc 缩小卡但仍 pending；主按钮仍在。不要 Esc = Reject（和 TUI 不同语义，Reject 是显式）。 | 是（收成胶囊，Tab/点击回来） |
 | B-06 | 权限卡 Ctrl+C | 取消该请求（reject/cancel）。 | 「拒绝」按钮。 | 是 |
 | B-07 | No 行打字回 agent | 在 No 行输入消息，Enter 发给 agent。 | 「拒绝并留言」输入框。 | 是（拒绝并发送 → interject + reject） |
-| B-08 | `remember_tool_approvals` | 关则没有 Always 本命令。restart 才生效。ask 和 auto 都适用。 | 设置项；选项列表以服务端给的为准。 | 部分：按 payload 渲染；无本地开关 |
+| B-08 | `remember_tool_approvals` | 关则没有 Always 本命令。restart 才生效。ask 和 auto 都适用。 | 设置项；选项列表以服务端给的为准。 | 部分：选项以服务端 payload 为准。**备注：本地 remember_tool_approvals 开关待讨论。** |
 | B-09 | 数字快捷 | `1–9` 直接选。 | 可做；也要鼠标。 | 是 |
 | B-10 | 提问卡 `ask_user_question` | 反向 `x.ai/ask_user_question`。单选/多选/自由文本。多问：`←/→` 上/下题。`1-9 a-f` 直选。`z` 到自由行。Space 多选 toggle。Enter 选并前进，末题提交。`y` 复制。`Shift+X` dismiss（agent 无答案继续）。`Ctrl+F` 全屏。超时可选 `toolset.ask_user_question.timeout_enabled`。 | 步进表单。必须 JSON-RPC 回 `AskUserQuestionExtResponse`（含 Cancelled）。Headless 直接 Cancelled——Web 不要学。 | 是（步进 + 多选 + 自由文本 + plan 再聊聊/跳过访谈） |
 | B-11 | 提问卡 Esc | 先取消本题选择；再停到滚动区。Dashboard overlay 第一题再 Esc 回 Dashboard。 | 多层：清选择 → 最小化卡 → 回列表。 | 是（清选择 → 收起；无 Dashboard） |
@@ -24,7 +24,7 @@
 | B-16 | `/feedback` 无选项面板 | 无答案可走；Enter 发送；Esc 关。 | textarea modal。 | 是（`/feedback` 卡片） |
 | B-17 | 权限通知抑制 | 一批权限只桌面通知一次，队列空清。 | 浏览器 Notification 同样去重。 | 是 |
 | B-18 | Auto 模式仍可能提问 | classifier 过不了的仍弹。 | UI 不能假设 auto 无卡。 | 是（auto 不跳过卡） |
-| B-19 | YOLO 跳过全部 | 包括危险。Shift+Tab 循环含 Always-approve。 | 危险模式徽章。 | 部分：YOLO 徽章 + 设置权限模式；无 Shift+Tab 循环 |
-| B-20 | Dashboard peek 里答题 | peek 显示选项时 `1-9` 答。 | peek 面板内嵌同一卡组件。 | 否（无 Dashboard） |
+| B-19 | YOLO 跳过全部 | 包括危险。Shift+Tab 循环含 Always-approve。 | 危险模式徽章。 | 是：YOLO 徽章 + 分段循环含始终允许 |
+| B-20 | Dashboard peek 里答题 | peek 显示选项时 `1-9` 答。 | peek 面板内嵌同一卡组件。 | 否。**备注：Dashboard peek 里答题 待讨论后再做。** |
 | B-21 | 子 agent 权限信息 | 卡上可带 `SubagentInfo`。 | 标明「来自子 agent X」。 | 是（payload 有则展示） |
-| B-22 | MCP 权限 scope | `McpScope` 状态。 | 展示 server/tool 名。 | 部分：工具 / 整个 server 切换并回 `{ kind, server/tool_name }`；现网 `always-allow` 只会记住这个工具 |
+| B-22 | MCP 权限 scope | `McpScope` 状态。 | 展示 server/tool 名。 | 部分：展示 server/tool。**备注：always-allow 只记这个工具，整 server 待讨论。** |

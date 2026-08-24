@@ -160,15 +160,18 @@ import {
   buildWorktreeListParams,
   buildWorktreeSyncParams,
   deepLinkSessionId,
-  formatSessionInfo,
+  formatTokenCount,
   groupSessionsByWorkspace,
   pickerDisplayTitle,
   readSessionCache,
   selectVisiblePickerSessions,
   writeSessionCache,
+  parseContextBreakdown,
   parseForkNewSessionId,
+  parseResumeWorktreeResult,
   parseRewindPoints,
   parseSearchHits,
+  parseSessionInfoFields,
   parseShareUrl,
   parseWorktreePath,
 } from "./session_ops";
@@ -226,6 +229,7 @@ const btnConnect = $<HTMLButtonElement>("btn-connect");
 const btnDisconnect = $<HTMLButtonElement>("btn-disconnect");
 const btnNew = $<HTMLButtonElement>("btn-new");
 const btnHome = $<HTMLButtonElement>("btn-home");
+const sessionTools = $<HTMLDetailsElement>("session-tools");
 const sessionSearch = $<HTMLInputElement>("session-search");
 const btnInfo = $<HTMLButtonElement>("btn-info");
 const btnRename = $<HTMLButtonElement>("btn-rename");
@@ -440,7 +444,7 @@ let dashDeleteArmed: { id: string; at: number } | null = null;
 let paletteItems: PaletteItem[] = [];
 let paletteIndex = 0;
 let paletteQuery = "";
-type AppDialogKind = "palette" | "shortcuts" | "args" | "later" | "block" | null;
+type AppDialogKind = "palette" | "shortcuts" | "args" | "later" | "block" | "sheet" | null;
 let appDialogKind: AppDialogKind = null;
 timeline.opts.showThinking = composerPrefs.showThinking;
 timeline.opts.groupTools = composerPrefs.groupTools;
@@ -1926,6 +1930,9 @@ function handleAgentEvent(method: string, params: Json) {
         "";
       if (effort) currentEffort = effort;
       syncComposerChips();
+      if (kind === "model_auto_switched") {
+        showBanner(`模型已自动换成 ${currentModelName || id}（原来的不可用）`, "model");
+      }
     }
   }
   if (method === "x.ai/sessions/changed") {
@@ -2400,7 +2407,7 @@ function toggleSessionPopover(anchor: HTMLElement, entry: SessionListEntry, ev?:
     ["删除", () => void deleteSession(entry, true)],
     ["分支", () => void forkSession(entry)],
     ["复制 id", () => void navigator.clipboard.writeText(entry.sessionId)],
-    ["在 worktree 打开", () => void resumeWorktree(entry)],
+    ["在独立副本打开", () => void resumeWorktree(entry)],
   ];
   sessionPopover.replaceChildren();
   for (const [label, fn] of acts) {
@@ -3048,19 +3055,11 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
     return true;
   }
   if (name === "export") {
-    if (!sessionId) {
-      showBanner("没有可导出的会话", "export");
-      return true;
-    }
-    downloadText(`${sessionId}.md`, threadText());
+    openExportSheet();
     return true;
   }
   if (name === "transcript") {
-    if (!sessionId) {
-      showBanner("没有可下载的记录", "transcript");
-      return true;
-    }
-    downloadText(`${sessionId}.txt`, threadText());
+    openExportSheet();
     return true;
   }
   if (name === "queue") {
@@ -3070,9 +3069,7 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
   }
   if (name === "context") {
     if (!entry) return true;
-    const info = await acpCall("x.ai/session/info", buildSessionInfoParams(entry.sessionId));
-    timeline.insertContext(formatSessionInfo(info));
-    syncThread();
+    await showContext(entry);
     return true;
   }
   if (name === "timestamps") {
@@ -3549,13 +3546,232 @@ async function forkSession(entry: SessionListEntry) {
   if (id) await loadSession(id, { cwd: sourceCwd, reconnect: false });
 }
 
+function closeSessionTools() {
+  sessionTools.open = false;
+}
+
+function sheetCopy(text: string): HTMLParagraphElement {
+  const p = document.createElement("p");
+  p.className = "sheet-copy";
+  p.textContent = text;
+  return p;
+}
+
+function sheetFoot(primary: string, onPrimary: () => void, opts?: { danger?: boolean }): HTMLElement {
+  const foot = document.createElement("div");
+  foot.className = "sheet-foot";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.textContent = "取消";
+  cancel.addEventListener("click", () => closeAppDialog());
+  const go = document.createElement("button");
+  go.type = "button";
+  go.className = opts?.danger ? "sheet-primary" : "sheet-primary";
+  go.textContent = primary;
+  go.addEventListener("click", onPrimary);
+  foot.append(cancel, go);
+  return foot;
+}
+
+function openUsageSheet(raw: Json, entry: SessionListEntry) {
+  const b = parseContextBreakdown(raw);
+  appDialogBody.replaceChildren();
+  const stack = document.createElement("div");
+  stack.className = "sheet-stack";
+  stack.append(
+    sheetCopy("模型一次能记住的内容有限。满了以后，较早的对话会被收成摘要。"),
+  );
+  const hero = document.createElement("div");
+  hero.className = "sheet-hero";
+  const pct = document.createElement("strong");
+  pct.textContent = b.percent != null ? `${Math.round(b.percent)}%` : "—";
+  const sub = document.createElement("span");
+  sub.textContent =
+    b.used != null && b.total != null
+      ? `${formatTokenCount(b.used)} / ${formatTokenCount(b.total)}`
+      : "还没有用量数字";
+  hero.append(pct, sub);
+  stack.append(hero);
+  const totalTokens = b.slices.reduce((sum, row) => sum + row.tokens, 0);
+  if (totalTokens > 0) {
+    const bar = document.createElement("div");
+    bar.className = "usage-bar";
+    bar.setAttribute("role", "img");
+    bar.setAttribute("aria-label", "上下文用量");
+    for (const slice of b.slices) {
+      const seg = document.createElement("span");
+      seg.dataset.key = slice.key;
+      seg.style.flex = String(Math.max(slice.tokens, 0));
+      seg.title = `${slice.label} ${formatTokenCount(slice.tokens)}`;
+      bar.append(seg);
+    }
+    stack.append(bar);
+    const rows = document.createElement("div");
+    rows.className = "usage-rows";
+    for (const slice of b.slices.filter((s) => s.key !== "free")) {
+      const row = document.createElement("div");
+      row.className = "usage-row";
+      const name = document.createElement("span");
+      name.textContent = slice.label;
+      const val = document.createElement("span");
+      val.className = "muted";
+      val.textContent = formatTokenCount(slice.tokens);
+      row.append(name, val);
+      rows.append(row);
+    }
+    if (b.free != null) {
+      const row = document.createElement("div");
+      row.className = "usage-row";
+      const name = document.createElement("span");
+      name.textContent = "还能用";
+      const val = document.createElement("span");
+      val.className = "muted";
+      val.textContent = formatTokenCount(b.free);
+      row.append(name, val);
+      rows.append(row);
+    }
+    stack.append(rows);
+  }
+  if (b.categories.length) {
+    const extra = document.createElement("div");
+    extra.className = "usage-rows";
+    for (const cat of b.categories) {
+      const row = document.createElement("div");
+      row.className = "usage-row";
+      const name = document.createElement("span");
+      name.textContent = cat.detail ? `${cat.label} · ${cat.detail}` : cat.label;
+      const val = document.createElement("span");
+      val.className = "muted";
+      val.textContent = formatTokenCount(cat.tokens);
+      row.append(name, val);
+      extra.append(row);
+    }
+    stack.append(extra);
+  }
+  const threshold = b.autoCompactAt ?? 85;
+  if (b.percent != null && b.percent >= Math.max(60, threshold - 15)) {
+    stack.append(sheetCopy(`接近上限（约 ${threshold}% 会自动压缩）。也可以现在压缩较早对话。`));
+    const go = document.createElement("button");
+    go.type = "button";
+    go.className = "sheet-cta";
+    go.textContent = "压缩较早对话";
+    go.addEventListener("click", () => {
+      closeAppDialog();
+      openCompactSheet(entry);
+    });
+    stack.append(go);
+  }
+  appDialogBody.append(stack);
+  showAppDialog("这次对话用了多少", "sheet");
+}
+
+function openInfoSheet(raw: Json) {
+  appDialogBody.replaceChildren();
+  const stack = document.createElement("div");
+  stack.className = "sheet-stack";
+  const rows = document.createElement("div");
+  rows.className = "info-rows";
+  for (const field of parseSessionInfoFields(raw)) {
+    const row = document.createElement("div");
+    row.className = "info-row";
+    const label = document.createElement("span");
+    label.className = "muted";
+    label.textContent = field.label;
+    const val = document.createElement("span");
+    val.textContent = field.value;
+    row.append(label, val);
+    if (field.label === "会话") {
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.textContent = "复制";
+      copy.addEventListener("click", () => {
+        void navigator.clipboard.writeText(field.value).then(
+          () => {
+            copy.textContent = "已复制";
+          },
+          () => undefined,
+        );
+      });
+      row.append(copy);
+    }
+    rows.append(row);
+  }
+  stack.append(rows, sheetCopy("点标题可以改名字。删除在会话菜单里。"));
+  appDialogBody.append(stack);
+  showAppDialog("会话信息", "sheet");
+}
+
+function openCompactSheet(entry: SessionListEntry) {
+  appDialogBody.replaceChildren();
+  const stack = document.createElement("div");
+  stack.className = "sheet-stack";
+  stack.append(
+    sheetCopy("把前面的对话收成摘要，给后面腾出空间。压缩后不能完整回看那些原文。"),
+  );
+  const field = document.createElement("label");
+  field.className = "sheet-field";
+  field.textContent = "附加说明（可空）";
+  const note = document.createElement("textarea");
+  note.placeholder = "例如：请保留接口约定";
+  field.append(note);
+  stack.append(field);
+  stack.append(
+    sheetFoot("压缩", () => {
+      closeAppDialog();
+      void (async () => {
+        await acpCall(
+          "x.ai/compact_conversation",
+          buildCompactParams(entry.sessionId, note.value.trim()),
+        );
+        showBanner("已开始压缩", "compact");
+      })().catch((e) => showBanner(e instanceof Error ? e.message : String(e)));
+    }),
+  );
+  appDialogBody.append(stack);
+  showAppDialog("压缩较早对话", "sheet");
+  note.focus();
+}
+
+function openExportSheet() {
+  if (!sessionId) {
+    showBanner("没有可导出的会话", "export");
+    return;
+  }
+  appDialogBody.replaceChildren();
+  const stack = document.createElement("div");
+  stack.className = "sheet-stack";
+  stack.append(sheetCopy("下载这次对话。Markdown 方便分享，纯文本更像完整记录。"));
+  const md = document.createElement("button");
+  md.type = "button";
+  md.className = "export-choice";
+  md.innerHTML = "<strong>下载 Markdown</strong><span>适合贴到文档或发给别人</span>";
+  md.addEventListener("click", () => {
+    downloadText(`${sessionId}.md`, threadText());
+    closeAppDialog();
+  });
+  const txt = document.createElement("button");
+  txt.type = "button";
+  txt.className = "export-choice";
+  txt.innerHTML = "<strong>下载纯文本</strong><span>同一份内容，.txt 文件</span>";
+  txt.addEventListener("click", () => {
+    downloadText(`${sessionId}.txt`, threadText());
+    closeAppDialog();
+  });
+  stack.append(md, txt);
+  appDialogBody.append(stack);
+  showAppDialog("导出这次对话", "sheet");
+}
+
 async function showInfo(entry: SessionListEntry) {
   const info = await acpCall("x.ai/session/info", buildSessionInfoParams(entry.sessionId));
-  openAction("会话信息", formatSessionInfo(info));
+  openInfoSheet(info);
 }
 
 async function showContext(entry: SessionListEntry) {
-  await refreshContextChip(entry.sessionId);
+  const info = extResultPayload(await acpCall("x.ai/session/info", buildSessionInfoParams(entry.sessionId)));
+  applyModelState(info);
+  applyContextUsage(info);
+  openUsageSheet(info, entry);
 }
 
 async function rewindSession(entry: SessionListEntry) {
@@ -3589,10 +3805,7 @@ async function rewindSession(entry: SessionListEntry) {
 }
 
 async function compactSession(entry: SessionListEntry) {
-  const ctx = window.prompt("压缩附加说明（可空）");
-  if (ctx === null) return;
-  await acpCall("x.ai/compact_conversation", buildCompactParams(entry.sessionId, ctx.trim()));
-  showBanner("已请求压缩", "compact");
+  openCompactSheet(entry);
 }
 
 async function recapSession(entry: SessionListEntry, auto: boolean) {
@@ -3614,42 +3827,117 @@ async function shareSession(entry: SessionListEntry) {
 
 async function newWorktree() {
   const source = workspaceCwd();
-  if (!source) throw new Error("需要 cwd");
-  const label = window.prompt("worktree 标签（可空）") ?? "";
-  const gitRef = window.prompt("git ref（可空，默认 HEAD）") ?? "";
-  const newId = crypto.randomUUID();
-  const raw = await acpCall(
-    "x.ai/git/worktree/create_from_worktree_sync",
-    buildWorktreeSyncParams({
-      sourceWorktreePath: source,
-      newSessionId: newId,
-      label: label.trim() || undefined,
-      gitRef: gitRef.trim() || undefined,
+  if (!source) throw new Error("需要工作目录");
+  appDialogBody.replaceChildren();
+  const stack = document.createElement("div");
+  stack.className = "sheet-stack";
+  stack.append(
+    sheetCopy("会复制一份当前仓库，在副本里开新会话。你正在改的文件不会被碰到。"),
+  );
+  const labelField = document.createElement("label");
+  labelField.className = "sheet-field";
+  labelField.textContent = "标签（可空）";
+  const label = document.createElement("input");
+  label.placeholder = "例如：修登录";
+  labelField.append(label);
+  const refField = document.createElement("label");
+  refField.className = "sheet-field";
+  refField.textContent = "基于哪个提交（可空，默认当前）";
+  const gitRef = document.createElement("input");
+  gitRef.placeholder = "main 或某个 commit";
+  gitRef.spellcheck = false;
+  refField.append(gitRef);
+  stack.append(labelField, refField);
+  stack.append(
+    sheetFoot("创建副本", () => {
+      closeAppDialog();
+      void (async () => {
+        const newId = crypto.randomUUID();
+        const raw = await acpCall(
+          "x.ai/git/worktree/create_from_worktree_sync",
+          buildWorktreeSyncParams({
+            sourceWorktreePath: source,
+            newSessionId: newId,
+            label: label.value.trim() || undefined,
+            gitRef: gitRef.value.trim() || undefined,
+          }),
+        );
+        const path = parseWorktreePath(raw) || source;
+        cwd.value = path;
+        persistFields();
+        await newSession();
+      })().catch((e) => showBanner(e instanceof Error ? e.message : String(e)));
     }),
   );
-  const path = parseWorktreePath(raw) || source;
-  cwd.value = path;
-  persistFields();
-  await newSession();
+  appDialogBody.append(stack);
+  showAppDialog("新建独立副本", "sheet");
+  label.focus();
 }
 
 async function resumeWorktree(entry: SessionListEntry) {
   const sourceCwd = entry.cwd || workspaceCwd();
-  if (!sourceCwd) throw new Error("需要 cwd");
-  await acpCall(
-    "x.ai/git/worktree/resume_session",
-    buildResumeInWorktreeParams({ sessionId: entry.sessionId, sourceCwd }),
+  if (!sourceCwd) throw new Error("需要工作目录");
+  appDialogBody.replaceChildren();
+  const stack = document.createElement("div");
+  stack.className = "sheet-stack";
+  stack.append(
+    sheetCopy("会复制一份仓库，这次会话在副本里继续。你现在的文件不会被改掉。"),
   );
-  await refreshSessions();
+  stack.append(
+    sheetFoot("打开副本", () => {
+      closeAppDialog();
+      void (async () => {
+        const raw = await acpCall(
+          "x.ai/git/worktree/resume_session",
+          buildResumeInWorktreeParams({ sessionId: entry.sessionId, sourceCwd }),
+        );
+        const result = parseResumeWorktreeResult(raw);
+        await refreshSessions();
+        if (result.sessionId) {
+          if (result.cwd) {
+            cwd.value = result.cwd;
+            persistFields();
+          }
+          await loadSession(result.sessionId, {
+            cwd: result.cwd || sourceCwd,
+            reconnect: false,
+          });
+        } else {
+          showBanner("已创建副本，请在左侧打开新会话", "worktree");
+        }
+      })().catch((e) => showBanner(e instanceof Error ? e.message : String(e)));
+    }),
+  );
+  appDialogBody.append(stack);
+  showAppDialog("在独立副本里打开", "sheet");
 }
 
 async function changeCwd() {
-  if (!window.confirm("改 cwd 只影响之后的新会话，不会移动当前 session。继续？")) return;
-  const next = window.prompt("新 cwd", workspaceCwd());
-  if (!next || !next.trim()) return;
-  cwd.value = next.trim();
-  persistFields();
-  showBanner(`新会话将使用 ${cwd.value}`, "cwd");
+  appDialogBody.replaceChildren();
+  const stack = document.createElement("div");
+  stack.className = "sheet-stack";
+  stack.append(sheetCopy("这只影响之后的新会话。当前这场对话不会搬家。"));
+  const field = document.createElement("label");
+  field.className = "sheet-field";
+  field.textContent = "工作目录";
+  const input = document.createElement("input");
+  input.value = workspaceCwd();
+  input.spellcheck = false;
+  field.append(input);
+  stack.append(field);
+  stack.append(
+    sheetFoot("保存", () => {
+      const next = input.value.trim();
+      if (!next) return;
+      cwd.value = next;
+      persistFields();
+      closeAppDialog();
+      showBanner(`之后的新会话会用 ${next}`, "cwd");
+    }),
+  );
+  appDialogBody.append(stack);
+  showAppDialog("下次会话的工作目录", "sheet");
+  input.focus();
 }
 
 async function logout(opts: { acp: boolean }): Promise<void> {
@@ -3703,6 +3991,14 @@ function withEntry(fn: (e: SessionListEntry) => Promise<void>) {
     fn(e).catch((err) => showBanner(err instanceof Error ? err.message : String(err)));
   };
 }
+sessionTools.addEventListener("click", (ev) => {
+  if ((ev.target as HTMLElement | null)?.closest("button")) closeSessionTools();
+});
+document.addEventListener("pointerdown", (ev) => {
+  if (!sessionTools.open) return;
+  if (sessionTools.contains(ev.target as Node)) return;
+  closeSessionTools();
+});
 btnInfo.addEventListener("click", withEntry(showInfo));
 btnRename.addEventListener("click", withEntry(renameSession));
 btnDelete.addEventListener("click", withEntry((e) => deleteSession(e, false)));
@@ -3712,12 +4008,10 @@ btnCompact.addEventListener("click", withEntry(compactSession));
 btnContext.addEventListener("click", withEntry(showContext));
 btnRecap.addEventListener("click", withEntry((e) => recapSession(e, false)));
 btnExport.addEventListener("click", () => {
-  if (!sessionId) return;
-  downloadText(`${sessionId}.md`, threadText());
+  openExportSheet();
 });
 btnTranscript.addEventListener("click", () => {
-  if (!sessionId) return;
-  downloadText(`${sessionId}.txt`, threadText());
+  openExportSheet();
 });
 btnShare.addEventListener("click", withEntry(shareSession));
 btnCd.addEventListener("click", () => {
@@ -5457,6 +5751,9 @@ declare global {
       offerPlan: (params: Json) => Promise<Json>;
       blockBusy: () => boolean;
       addComposerImage: (input: { mimeType: string; data: string; name?: string }) => void;
+      openExportSheet: () => void;
+      openCompactSheet: () => void;
+      openUsageSheet: () => void;
     };
   }
 }
@@ -5525,4 +5822,62 @@ window.__grokWebTest = {
   offerQuestion: (params) => blockHost.offerQuestion(params),
   offerPlan: (params) => blockHost.offerPlan(params),
   blockBusy: () => blockHost.busy,
+  openExportSheet: () => {
+    const had = sessionId;
+    if (!sessionId) sessionId = "demo";
+    openExportSheet();
+    if (!had) sessionId = had;
+  },
+  openCompactSheet: () => {
+    openCompactSheet({
+      sessionId: sessionId || "demo",
+      summary: "demo",
+      cwd: workspaceCwd() || null,
+      updatedAt: null,
+      source: null,
+      lastTurnSummary: null,
+      sessionKind: null,
+      adminKind: "build",
+      worktreeLabel: null,
+      gitRootDir: null,
+      sourceWorkspaceDir: null,
+      repoName: null,
+    });
+  },
+  openUsageSheet: () => {
+    openUsageSheet(
+      {
+        sessionId: "demo",
+        cwd: "/tmp/project",
+        data: {
+          modelDisplayName: "Grok 4.6",
+          turns: 3,
+          context: {
+            used: 8200,
+            total: 10000,
+            usagePct: 82,
+            systemPromptTokens: 400,
+            messageTokens: 7000,
+            toolDefinitionsTokens: 800,
+            freeTokens: 1800,
+            autoCompactThresholdPercent: 85,
+          },
+        },
+      },
+      {
+        sessionId: sessionId || "demo",
+        summary: "demo",
+        cwd: "/tmp/project",
+        updatedAt: null,
+        source: null,
+        lastTurnSummary: null,
+        sessionKind: null,
+        adminKind: "build",
+        worktreeLabel: null,
+        gitRootDir: null,
+        sourceWorkspaceDir: null,
+        repoName: null,
+      },
+    );
+  },
 };

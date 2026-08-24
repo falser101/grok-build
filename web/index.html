@@ -119,6 +119,29 @@
               </svg>
             </button>
             <button type="button" class="session" id="session-label" title="重命名">无 session</button>
+            <details id="session-tools">
+              <summary aria-label="会话操作" title="会话操作">⋯</summary>
+              <div class="session-menu" role="menu">
+                <button id="btn-context" type="button" disabled>用量</button>
+                <button id="btn-compact" type="button" disabled>压缩较早对话</button>
+                <button id="btn-export" type="button" disabled>导出</button>
+                <button id="btn-share" type="button" disabled>分享</button>
+                <button id="btn-rewind" type="button" disabled>回退</button>
+                <button id="btn-rename" type="button" disabled>重命名</button>
+                <button id="btn-delete" type="button" disabled data-danger="1">删除</button>
+                <div class="session-menu-sep" role="separator"></div>
+                <p class="session-menu-label">高级</p>
+                <button id="btn-info" type="button" disabled>会话信息</button>
+                <button id="btn-fork" type="button" disabled>分支一份</button>
+                <button id="btn-recap" type="button" disabled>回顾</button>
+                <button id="btn-worktree-resume" type="button" disabled>在独立副本打开</button>
+                <button id="btn-worktree-new" type="button" disabled>新建独立副本</button>
+                <button id="btn-cd" type="button" disabled>下次会话的工作目录</button>
+                <button id="btn-expand-all" type="button" disabled>全部展开</button>
+                <button id="btn-collapse-all" type="button" disabled>全部折叠</button>
+                <button id="btn-transcript" type="button" hidden disabled>下载记录</button>
+              </div>
+            </details>
           </div>
           <div class="header-status" id="header-status">
             <div class="header-model-wrap">
@@ -133,27 +156,6 @@
             <button type="button" id="header-context">上下文 —%</button>
           <div class="header-actions">
             <button id="btn-home" type="button" disabled>回列表</button>
-            <details id="session-tools">
-              <summary>会话</summary>
-              <div class="session-menu">
-                <button id="btn-info" type="button" disabled>会话信息</button>
-                <button id="btn-rename" type="button" disabled>重命名</button>
-                <button id="btn-delete" type="button" disabled>删除</button>
-                <button id="btn-fork" type="button" disabled>分支</button>
-                <button id="btn-rewind" type="button" disabled>回退</button>
-                <button id="btn-compact" type="button" disabled>压缩</button>
-                <button id="btn-context" type="button" disabled>上下文</button>
-                <button id="btn-recap" type="button" disabled>回顾</button>
-                <button id="btn-export" type="button" disabled>导出</button>
-                <button id="btn-transcript" type="button" disabled>下载记录</button>
-                <button id="btn-share" type="button" disabled>分享</button>
-                <button id="btn-cd" type="button" disabled>改工作目录</button>
-                <button id="btn-worktree-new" type="button" disabled>新 worktree</button>
-                <button id="btn-worktree-resume" type="button" disabled>在 worktree 打开</button>
-                <button id="btn-expand-all" type="button" disabled>全部展开</button>
-                <button id="btn-collapse-all" type="button" disabled>全部折叠</button>
-              </div>
-            </details>
           </div>
           </div>
         </header>

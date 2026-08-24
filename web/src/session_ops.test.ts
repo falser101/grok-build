@@ -7,6 +7,7 @@ import {
   buildSessionRenameParams,
   buildSessionSearchParams,
   deepLinkSessionId,
+  formatTokenCount,
   groupSessionsByWorkspace,
   PICKER_GROUP_LIMIT,
   pickerDisplayTitle,
@@ -14,9 +15,12 @@ import {
   readSessionCache,
   selectVisiblePickerSessions,
   writeSessionCache,
+  parseContextBreakdown,
   parseForkNewSessionId,
+  parseResumeWorktreeResult,
   parseRewindPoints,
   parseSearchHits,
+  parseSessionInfoFields,
   workspaceGroupKey,
   workspaceGroupLabel,
 } from "./session_ops.ts";
@@ -235,4 +239,52 @@ test("rewind points accept camelCase and snake_case", () => {
   });
   assert.equal(pts[0]?.promptIndex, 2);
   assert.equal(pts[0]?.preview, "hello");
+});
+
+test("context breakdown prefers a stacked bar over a single dump", () => {
+  const b = parseContextBreakdown({
+    sessionId: "abc",
+    cwd: "/repo",
+    data: {
+      modelDisplayName: "Grok 4.6",
+      turns: 4,
+      context: {
+        used: 2500,
+        total: 10000,
+        usagePct: 25,
+        systemPromptTokens: 400,
+        messageTokens: 1800,
+        toolDefinitionsTokens: 300,
+        freeTokens: 7500,
+        autoCompactThresholdPercent: 85,
+        usageCategories: [{ label: "Skills", tokens: 120, detail: "3 skills" }],
+      },
+    },
+  });
+  assert.equal(b.percent, 25);
+  assert.equal(b.sessionId, "abc");
+  assert.equal(b.autoCompactAt, 85);
+  assert.deepEqual(
+    b.slices.map((s) => s.key),
+    ["messages", "system", "tools", "free"],
+  );
+  assert.equal(b.categories[0]?.label, "Skills");
+  assert.equal(formatTokenCount(1800), "1.8k");
+  const fields = parseSessionInfoFields({
+    sessionId: "abc",
+    cwd: "/repo",
+    data: { model: "grok-4", turns: 4, context: { used: 25, total: 100 } },
+  });
+  assert.equal(fields[0]?.label, "会话");
+  assert.ok(fields.some((f) => f.label === "用量"));
+});
+
+test("resume worktree result prefers the forked session and effective cwd", () => {
+  const r = parseResumeWorktreeResult({
+    sessionId: "fork-1",
+    effectiveCwd: "/tmp/wt",
+    worktreePath: "/tmp/wt",
+  });
+  assert.equal(r.sessionId, "fork-1");
+  assert.equal(r.cwd, "/tmp/wt");
 });

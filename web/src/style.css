@@ -280,16 +280,27 @@ body {
 
 #session-tools {
   position: relative;
+  flex: 0 0 auto;
 }
 
 #session-tools summary {
   cursor: pointer;
   list-style: none;
-  padding: 0.32rem 0.65rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
   background: transparent;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 8px;
-  font-size: 0.82rem;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--muted);
+}
+
+#session-tools summary:hover {
+  background: var(--bg-3);
   color: var(--ink);
 }
 
@@ -300,14 +311,14 @@ body {
 .session-menu {
   display: none;
   position: absolute;
-  right: 0;
+  left: 0;
   top: calc(100% + 6px);
-  min-width: 12.5rem;
+  min-width: 13.5rem;
   padding: 0.3rem;
-  background: var(--bg-2);
+  background: var(--popover);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 12px 32px #00000080;
+  border-radius: 12px;
+  box-shadow: 0 16px 48px var(--shadow);
   z-index: 8;
 }
 
@@ -322,11 +333,31 @@ body {
   text-align: left;
   background: transparent;
   color: var(--ink);
-  border-radius: 6px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.42rem 0.6rem;
+  font: inherit;
+  font-size: 0.86rem;
 }
 
 #session-tools .session-menu button:hover {
   background: var(--bg-3);
+}
+
+#session-tools .session-menu button[data-danger] {
+  color: var(--danger);
+}
+
+.session-menu-sep {
+  height: 1px;
+  background: var(--line);
+  margin: 0.28rem 0.4rem;
+}
+
+.session-menu-label {
+  margin: 0.15rem 0.6rem 0.05rem;
+  font-size: 0.68rem;
+  color: var(--muted);
 }
 
 .workspace-group {
@@ -3114,10 +3145,7 @@ html[data-compact="1"] #sidebar #btn-new {
 }
 
 #session-label::after {
-  content: " ▾";
-  color: var(--muted);
-  font-weight: 400;
-  font-size: 0.75em;
+  content: none;
 }
 
 #header-context {
@@ -3338,6 +3366,193 @@ html[data-compact="1"] #sidebar #btn-new {
 
 #app-dialog[data-kind="block"] .app-dialog-panel {
   width: min(44rem, calc(100vw - 36px));
+}
+
+#app-dialog[data-kind="sheet"] .app-dialog-panel {
+  width: min(26rem, calc(100vw - 48px));
+}
+
+.sheet-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.sheet-copy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.sheet-hero {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.sheet-hero strong {
+  font-size: 2rem;
+  letter-spacing: -0.03em;
+  font-weight: 650;
+}
+
+.sheet-hero span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.usage-bar {
+  display: flex;
+  height: 0.55rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg-3);
+}
+
+.usage-bar > span {
+  display: block;
+  height: 100%;
+  min-width: 0;
+}
+
+.usage-bar > span[data-key="messages"],
+.usage-bar > span[data-key="used"] {
+  background: var(--accent);
+}
+
+.usage-bar > span[data-key="system"] {
+  background: #7a7a7a;
+}
+
+.usage-bar > span[data-key="tools"] {
+  background: var(--edit);
+}
+
+.usage-bar > span[data-key="other"] {
+  background: #6a7a98;
+}
+
+.usage-bar > span[data-key="free"] {
+  background: transparent;
+}
+
+.usage-rows,
+.info-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.usage-row,
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.8rem;
+  font-size: 0.86rem;
+}
+
+.usage-row .muted,
+.info-row .muted {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.info-row button {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0;
+  cursor: pointer;
+}
+
+.sheet-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin-top: 0.15rem;
+}
+
+.sheet-foot button {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.sheet-primary {
+  background: var(--btn-primary-bg) !important;
+  color: var(--btn-primary-ink) !important;
+  border-color: transparent !important;
+}
+
+.sheet-cta {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.55rem 0.8rem;
+  font: inherit;
+  font-size: 0.9rem;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-ink);
+}
+
+.sheet-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.sheet-field input,
+.sheet-field textarea {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.sheet-field textarea {
+  min-height: 4.2rem;
+  resize: vertical;
+}
+
+.export-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg-3);
+  color: var(--ink);
+  font: inherit;
+}
+
+.export-choice:hover {
+  border-color: var(--accent);
+}
+
+.export-choice strong {
+  font-size: 0.92rem;
+}
+
+.export-choice span {
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .dialog-head-actions {

@@ -185,6 +185,157 @@ export function parseShareUrl(payload: Json): string | null {
   return url;
 }
 
+function asNum(value: Json | undefined): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function pickNum(bag: { [k: string]: Json } | null, keys: string[]): number | null {
+  if (!bag) return null;
+  for (const key of keys) {
+    const n = asNum(bag[key]);
+    if (n != null) return n;
+  }
+  return null;
+}
+
+function pickStr(bag: { [k: string]: Json } | null, keys: string[]): string | null {
+  if (!bag) return null;
+  for (const key of keys) {
+    const v = bag[key];
+    if (typeof v === "string" && v.trim()) return v;
+  }
+  return null;
+}
+
+export type ContextSlice = {
+  key: string;
+  label: string;
+  tokens: number;
+};
+
+export type ContextCategory = {
+  label: string;
+  tokens: number;
+  detail: string | null;
+};
+
+export type ContextBreakdown = {
+  used: number | null;
+  total: number | null;
+  percent: number | null;
+  free: number | null;
+  autoCompactAt: number | null;
+  turns: number | null;
+  messageCount: number | null;
+  slices: ContextSlice[];
+  categories: ContextCategory[];
+  sessionId: string | null;
+  cwd: string | null;
+  model: string | null;
+};
+
+export function formatTokenCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  return String(Math.round(n));
+}
+
+/** Readable /context sheet — stacked bar + rows, not a pie. */
+export function parseContextBreakdown(payload: Json): ContextBreakdown {
+  const rec = asRecord(payload);
+  const inner = asRecord((rec?.result ?? payload) as Json) ?? rec;
+  const data = asRecord(inner?.data ?? null) ?? inner;
+  const ctx = asRecord(data?.context ?? null) ?? asRecord(inner?.context ?? null) ?? data;
+  const used = pickNum(ctx, ["used", "tokens", "usedTokens", "used_tokens"]);
+  const total = pickNum(ctx, ["total", "contextWindow", "context_window", "limit"]);
+  let percent = pickNum(ctx, ["usagePct", "usage_pct", "usedPercent", "used_percent"]);
+  if (percent == null && used != null && total && total > 0) percent = (used / total) * 100;
+  const free = pickNum(ctx, ["freeTokens", "free_tokens"]);
+  const autoCompactAt = pickNum(ctx, [
+    "autoCompactThresholdPercent",
+    "auto_compact_threshold_percent",
+  ]);
+  const system = pickNum(ctx, ["systemPromptTokens", "system_prompt_tokens"]) ?? 0;
+  const messages = pickNum(ctx, ["messageTokens", "message_tokens"]) ?? 0;
+  const tools = pickNum(ctx, ["toolDefinitionsTokens", "tool_definitions_tokens"]) ?? 0;
+  const slices: ContextSlice[] = [];
+  if (messages > 0) slices.push({ key: "messages", label: "对话", tokens: messages });
+  if (system > 0) slices.push({ key: "system", label: "系统说明", tokens: system });
+  if (tools > 0) slices.push({ key: "tools", label: "工具定义", tokens: tools });
+  const accounted = slices.reduce((sum, row) => sum + row.tokens, 0);
+  if (used != null && used > accounted) {
+    slices.push({ key: "other", label: "其它", tokens: used - accounted });
+  } else if (!slices.length && used != null && used > 0) {
+    slices.push({ key: "used", label: "已用", tokens: used });
+  }
+  const freeTokens =
+    free != null ? free : total != null && used != null ? Math.max(0, total - used) : null;
+  if (freeTokens != null && freeTokens > 0) {
+    slices.push({ key: "free", label: "还能用", tokens: freeTokens });
+  }
+  const categories: ContextCategory[] = [];
+  const rows = ctx?.usageCategories ?? ctx?.usage_categories;
+  if (Array.isArray(rows)) {
+    for (const row of rows) {
+      const r = asRecord(row);
+      if (!r) continue;
+      const label = pickStr(r, ["label", "name"]);
+      if (!label) continue;
+      categories.push({
+        label,
+        tokens: pickNum(r, ["tokens"]) ?? 0,
+        detail: pickStr(r, ["detail"]),
+      });
+    }
+  }
+  return {
+    used,
+    total,
+    percent,
+    free: freeTokens,
+    autoCompactAt,
+    turns: pickNum(data, ["turns", "turnCount", "turn_count"]),
+    messageCount: pickNum(ctx, ["messageCount", "message_count"]),
+    slices,
+    categories,
+    sessionId: pickStr(inner, ["sessionId", "session_id"]),
+    cwd: pickStr(inner, ["cwd"]),
+    model: pickStr(data, ["modelDisplayName", "model_display_name", "model"]),
+  };
+}
+
+export function parseSessionInfoFields(payload: Json): { label: string; value: string }[] {
+  const rec = asRecord(payload);
+  const inner = asRecord((rec?.result ?? payload) as Json) ?? rec;
+  const data = asRecord(inner?.data ?? null) ?? inner;
+  const ctx = asRecord(data?.context ?? null);
+  const fields: { label: string; value: string }[] = [];
+  const id = pickStr(inner, ["sessionId", "session_id"]);
+  const cwd = pickStr(inner, ["cwd"]);
+  const model = pickStr(data, ["modelDisplayName", "model_display_name", "model"]);
+  const turns = pickNum(data, ["turns"]);
+  if (id) fields.push({ label: "会话", value: id });
+  if (cwd) fields.push({ label: "工作目录", value: cwd });
+  if (model) fields.push({ label: "模型", value: model });
+  if (turns != null) fields.push({ label: "回合", value: String(turns) });
+  if (ctx) {
+    const used = ctx.usagePct ?? ctx.usage_pct ?? ctx.usedPercent ?? ctx.used_percent ?? ctx.used ?? ctx.tokens;
+    const total = ctx.total ?? ctx.contextWindow ?? ctx.context_window;
+    if (used !== undefined) {
+      fields.push({
+        label: "用量",
+        value: total !== undefined ? `${String(used)} / ${String(total)}` : String(used),
+      });
+    }
+  }
+  return fields;
+}
+
 export function formatSessionInfo(payload: Json): string {
   const rec = asRecord(payload);
   const inner = asRecord(rec?.result ?? payload) ?? rec;
@@ -246,6 +397,27 @@ export function parseWorktreePath(payload: Json): string | null {
   if (creating && typeof creating.worktreePath === "string") return creating.worktreePath;
   if (creating && typeof creating.worktree_path === "string") return creating.worktree_path;
   return null;
+}
+
+/** `x.ai/git/worktree/resume_session` — load this id in the new copy. */
+export function parseResumeWorktreeResult(payload: Json): {
+  sessionId: string | null;
+  cwd: string | null;
+  worktreePath: string | null;
+} {
+  const rec = asRecord(payload);
+  const inner = asRecord(rec?.result ?? payload) ?? rec;
+  if (!inner) return { sessionId: null, cwd: null, worktreePath: null };
+  const sessionId =
+    (typeof inner.sessionId === "string" && inner.sessionId) ||
+    (typeof inner.session_id === "string" && inner.session_id) ||
+    null;
+  const cwd =
+    (typeof inner.effectiveCwd === "string" && inner.effectiveCwd) ||
+    (typeof inner.effective_cwd === "string" && inner.effective_cwd) ||
+    null;
+  const worktreePath = parseWorktreePath(inner);
+  return { sessionId, cwd: cwd || worktreePath, worktreePath };
 }
 
 export function deepLinkSessionId(search: string): string | null {

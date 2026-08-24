@@ -192,7 +192,52 @@ test("header does not show model chip or session tools", async ({ page }) => {
   await expect(page.locator(".header-model-wrap")).toBeHidden();
   await expect(page.locator("#btn-header-model")).toBeHidden();
   await expect(page.locator(".header-right")).toBeHidden();
+  await expect(page.locator("#session-tools")).toBeHidden();
   await expect(page.locator("#composer #btn-model-chip")).toBeVisible();
+});
+
+test("session overflow menu sits next to the title", async ({ page }) => {
+  await page.goto("/?noconnect=1");
+  await page.evaluate(() => {
+    document.getElementById("app")?.setAttribute("data-surface", "session");
+  });
+  await expect(page.locator("#session-tools")).toBeVisible();
+  await expect(page.locator(".header-right")).toBeHidden();
+  await page.locator("#session-tools summary").click();
+  await expect(page.locator("#btn-context")).toHaveText("用量");
+  await expect(page.locator("#btn-compact")).toHaveText("压缩较早对话");
+  await expect(page.locator("#btn-export")).toHaveText("导出");
+  await expect(page.locator("#btn-worktree-resume")).toHaveText("在独立副本打开");
+});
+
+test("usage export and compact sheets are readable", async ({ page }) => {
+  await page.goto("/?noconnect=1");
+  await page.evaluate(() => window.__grokWebTest?.openUsageSheet());
+  await expect(page.locator("#app-dialog")).toBeVisible();
+  await expect(page.locator("#app-dialog-title")).toHaveText("这次对话用了多少");
+  await expect(page.locator("#app-dialog")).toContainText("82%");
+  await expect(page.locator("#app-dialog")).toContainText("对话");
+  await expect(page.locator("#app-dialog")).toContainText("还能用");
+  await expect(page.locator("#app-dialog")).toContainText("压缩较早对话");
+  await page.locator("#btn-app-dialog-close").click();
+  await page.evaluate(() => window.__grokWebTest?.openExportSheet());
+  await expect(page.locator("#app-dialog-title")).toHaveText("导出这次对话");
+  await expect(page.locator("#app-dialog")).toContainText("下载 Markdown");
+  await expect(page.locator("#app-dialog")).toContainText("下载纯文本");
+  await page.locator("#btn-app-dialog-close").click();
+  await page.evaluate(() => window.__grokWebTest?.openCompactSheet());
+  await expect(page.locator("#app-dialog-title")).toHaveText("压缩较早对话");
+  await expect(page.locator("#app-dialog")).toContainText("不能完整回看");
+});
+
+test("model_auto_switched tells the user the model changed", async ({ page }) => {
+  await page.goto("/?noconnect=1");
+  await page.evaluate(() => {
+    window.__grokWebTest?.applyUpdate("session/update", {
+      update: { sessionUpdate: "model_auto_switched", modelId: "grok-4" },
+    });
+  });
+  await expect(page.locator("#banner")).toContainText("模型已自动换成");
 });
 
 test("header context chip shows percent from session_status", async ({ page }) => {

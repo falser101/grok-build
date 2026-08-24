@@ -395,6 +395,10 @@ let wantOpen = false;
 let reconnectTimer: number | null = null;
 let reconnectAttempt = 0;
 let turnRunning = false;
+let canceling = false;
+let lastCancelSubagents = true;
+let lastEscArm: EscArm = null;
+let escHintTimer = 0;
 let promptEpoch = 0;
 let yoloMode = false;
 let sessionPermMode: SessionPermMode = "ask";
@@ -1729,11 +1733,6 @@ async function acpCall(method: string, params: Json): Promise<Json> {
 acp.onNotification = (method, params) => {
   handleAgentEvent(method, params);
 };
-
-let canceling = false;
-let lastCancelSubagents = true;
-let lastEscArm: EscArm = null;
-let escHintTimer = 0;
 
 function hideEscHint() {
   if (escHintTimer) {

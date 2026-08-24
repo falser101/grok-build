@@ -436,62 +436,74 @@
             <h2 id="settings-title">设置</h2>
             <button id="btn-settings-close" type="button">关闭</button>
           </div>
-          <label class="grow">
-            cwd
-            <input id="cwd" spellcheck="false" autocomplete="off" />
-          </label>
-          <div class="grow theme-pref-field">
-            <span class="theme-pref-label">外观</span>
-            <div id="theme-pref" class="mode-seg theme-seg" role="radiogroup" aria-label="外观">
-              <button type="button" data-theme-pref="auto">跟随系统</button>
-              <button type="button" data-theme-pref="dark">深</button>
-              <button type="button" data-theme-pref="light">浅</button>
+          <section class="settings-group">
+            <h3>外观</h3>
+            <div class="grow theme-pref-field">
+              <span class="theme-pref-label">外观</span>
+              <div id="theme-pref" class="mode-seg theme-seg" role="radiogroup" aria-label="外观">
+                <button type="button" data-theme-pref="auto">跟随系统</button>
+                <button type="button" data-theme-pref="dark">深</button>
+                <button type="button" data-theme-pref="light">浅</button>
+              </div>
             </div>
-          </div>
-          <label class="check">
-            <input id="compact-mode" type="checkbox" />
-            <span>紧凑<span class="check-hint">减少界面间距，显示更多内容</span></span>
-          </label>
-          <label class="check">
-            <input id="enter-sends" type="checkbox" checked />
-            Enter 发送（关闭则 Ctrl+Enter 发送）
-          </label>
-          <label class="check">
-            <input id="show-thinking" type="checkbox" checked />
-            显示思考
-          </label>
-          <label class="check">
-            <input id="group-tools" type="checkbox" checked />
-            合并只读工具
-          </label>
-          <label class="check">
-            <input id="show-timestamps" type="checkbox" />
-            显示时间戳
-          </label>
-          <label class="check">
-            <input id="show-rail" type="checkbox" checked />
-            显示时间线
-          </label>
-          <label class="check">
-            <input id="combine-queued" type="checkbox" />
-            合并连续跟进
-          </label>
-          <label class="grow">
-            权限
-            <select id="permission-mode">
-              <option value="ask">每次询问</option>
-              <option value="auto">自动（仍可能提问）</option>
-              <option value="always-approve">始终允许</option>
-            </select>
-          </label>
-          <label class="grow">
-            取消时子 agent
-            <select id="cancel-subagents-pref">
-              <option value="ask">每次询问</option>
-              <option value="always_stop">一起停</option>
-              <option value="always_continue">留着跑</option>
-            </select>
-          </label>
+            <label class="check">
+              <input id="compact-mode" type="checkbox" />
+              <span>紧凑<span class="check-hint">减少界面间距，显示更多内容</span></span>
+            </label>
+            <label class="check">
+              <input id="show-thinking" type="checkbox" checked />
+              显示思考
+            </label>
+            <label class="check">
+              <input id="group-tools" type="checkbox" checked />
+              合并只读工具
+            </label>
+            <label class="check">
+              <input id="show-timestamps" type="checkbox" />
+              显示时间戳
+            </label>
+            <label class="check">
+              <input id="show-rail" type="checkbox" checked />
+              显示时间线
+            </label>
+          </section>
+          <section class="settings-group">
+            <h3>编辑</h3>
+            <label class="check">
+              <input id="enter-sends" type="checkbox" checked />
+              Enter 发送（关闭则 Ctrl+Enter 发送）
+            </label>
+            <label class="check">
+              <input id="combine-queued" type="checkbox" />
+              合并连续跟进
+            </label>
+          </section>
+          <section class="settings-group">
+            <h3>权限</h3>
+            <label class="grow">
+              权限
+              <select id="permission-mode">
+                <option value="ask">每次询问</option>
+                <option value="auto">自动（仍可能提问）</option>
+                <option value="always-approve">始终允许</option>
+              </select>
+            </label>
+            <label class="grow">
+              取消时子 agent
+              <select id="cancel-subagents-pref">
+                <option value="ask">每次询问</option>
+                <option value="always_stop">一起停</option>
+                <option value="always_continue">留着跑</option>
+              </select>
+            </label>
+          </section>
+          <section class="settings-group">
+            <h3>工作目录</h3>
+            <label class="grow">
+              cwd
+              <input id="cwd" spellcheck="false" autocomplete="off" />
+            </label>
+          </section>
           <details class="dock-advanced" open>
             <summary>高级连接</summary>
             <div class="advanced-fields">

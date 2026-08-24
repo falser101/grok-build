@@ -655,6 +655,26 @@ body {
   font-size: 1.05rem;
 }
 
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-top: 0.15rem;
+  border-top: 1px solid var(--line);
+}
+
+.settings-group:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.settings-group h3 {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .settings-panel label,
 .theme-pref-field {
   display: flex;

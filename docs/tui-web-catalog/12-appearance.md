@@ -7,15 +7,15 @@
 | V-03 | TokyoNight | 需 truecolor | Web 真彩无压力 | 否。**备注：TokyoNight 第三主题 待讨论后再做。** |
 | V-04 | Rose Pine Moon | 需 truecolor | 同 | 否。**备注：Rose Pine 待讨论后再做。** |
 | V-05 | Oscura Midnight | 需 truecolor | 同 | 否。**备注：Oscura 待讨论后再做。** |
-| V-06 | theme=auto | 跟 OS：macOS/Linux portal/Windows；SSH `GROK_APPEARANCE`/`LC_*`；OSC 11 | `prefers-color-scheme` + 手动覆盖 | 是（默认跟随系统，设置可锁深色/浅色） |
+| V-06 | theme=auto | 跟 OS：macOS/Linux portal/Windows；SSH `GROK_APPEARANCE`/`LC_*`；OSC 11 | `prefers-color-scheme` + 手动覆盖 | 是：设置三钮「跟随系统 / 深色 / 浅色」即时整页换；默认 auto |
 | V-07 | auto_dark/light_theme | 映射具体主题 | 设置两套 | 否（N/A）：Web 只有深/浅/跟随系统 |
-| V-08 | `/theme` 预览 | 箭头即时预览，Esc 还原 | 悬停预览 | 是：设置即时换；Esc 关设置即停在所选 |
-| V-09 | GROK_THEME env | 强制 | Web 用 localStorage | 是：localStorage `grok-web.theme` |
+| V-08 | `/theme` 预览 | 箭头即时预览，Esc 还原 | 悬停预览 | 是：`/theme` 同 store；点选预览，Esc 还原；设置三钮即时换 |
+| V-09 | GROK_THEME env | 强制 | Web 用 localStorage | 是：localStorage `grok-web.theme`；`/theme` 与设置共用 `applyTheme` |
 | V-10 | NO_COLOR | 单色 | 尊重；Web 少见 | 否（N/A） |
 | V-11 | 颜色量化 | 启动按 16/256/truecolor | 不需要 | 否（N/A） |
 | V-12 | 光标 OSC 12 | 会话中改终端光标为 accent_user，退出 OSC 112 | CSS caret-color | 是：CSS caret-color |
-| V-13 | Compact mode | `/compact-mode`，≤20 行自动开 | `--density compact` | 是：`/compact-mode` + data-compact |
-| V-14 | 主题槽 | bg_*、accent_*、text、gray、semantic、border、paste、diff、md_* | 一份 tokens.css | 是：style.css 变量槽（不必 1:1 pager.toml） |
+| V-13 | Compact mode | `/compact-mode`，≤20 行自动开 | `--density compact` | 是：`/compact-mode` 开关 `data-compact` + `grok-web.compact-mode` |
+| V-14 | 主题槽 | bg_*、accent_*、text、gray、semantic、border、paste、diff、md_* | 一份 tokens.css | 是：style.css 变量；思考/工具/composer/侧栏走 token |
 | V-15 | 语法 tmTheme | 三套内置 | shiki 映射 | 部分：轻量 tokenizer。**备注：不引入 shiki。** |
 | V-16 | screen_mode | fullscreen/minimal 默认，restart | Web 单一 DOM | 否（N/A） |
 | V-17 | `/minimal` 重 exec | 环境变量一次性 | 不做 | 否（不做） |
@@ -44,7 +44,7 @@
 | V-40 | collapsed_edit_blocks | | T-08 | 否。**备注：collapsed_edit_blocks 待讨论后再做。** |
 | V-41 | display_refresh_auto_cadence | 高刷 >60Hz；restart；Minimal 藏 | `requestAnimationFrame` 即可 | 否（N/A）：rAF 即可 |
 | V-42 | Doctor 颜色级别 | 报告 truecolor/256/16 | Web 总是真彩 | 否（N/A） |
-| V-43 | 系统外观轮询 5s | 桌面 API | matchMedia listener 一次即可 | 是（matchMedia change） |
+| V-43 | 系统外观轮询 5s | 桌面 API | matchMedia listener 一次即可 | 是：`prefers-color-scheme` change 时 auto 重 applyTheme |
 | V-44 | wrap ssh 传 LC_GROK_APPEARANCE | SSH 主题 | N/A | 否（N/A） |
 | V-45 | 小屏自动 compact | 20 行 | 窄视口 media query | 部分：窄屏侧栏可折。**备注：自动 compact 阈值 {NOTE}。** |
 | V-46 | `contextual_hints.small_screen` | tip | 可做 | 否（不做）：不弹小屏 tip |

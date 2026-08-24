@@ -5,6 +5,7 @@ import {
   LATER_TOAST,
   LOCAL_SLASH,
   applyCompactMode,
+  loadCompactMode,
   canonicalSlashName,
   helpLines,
   mergeSlashMenu,
@@ -103,6 +104,12 @@ test("theme cycle, effort parse, compact mode persist", () => {
   });
   assert.equal(root.dataset.compact, "1");
   assert.equal(store.get("grok-web.compact-mode"), "1");
+  applyCompactMode(false, root, {
+    setItem: (k, v) => store.set(k, v),
+  });
+  assert.equal(root.dataset.compact, "0");
+  assert.equal(store.get("grok-web.compact-mode"), "0");
+  assert.equal(loadCompactMode({ getItem: (k) => store.get(k) ?? null }), false);
 });
 
 test("canonical aliases and help listing", () => {

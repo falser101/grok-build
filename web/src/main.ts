@@ -299,7 +299,7 @@ const groupToolsEl = $<HTMLInputElement>("group-tools");
 const showTimestampsEl = $<HTMLInputElement>("show-timestamps");
 const showRailEl = $<HTMLInputElement>("show-rail");
 const combineQueuedEl = $<HTMLInputElement>("combine-queued");
-const themePrefEl = $<HTMLSelectElement>("theme-pref");
+const themePrefEl = $("theme-pref");
 const threadRail = $("thread-rail");
 const railTrack = $("rail-track");
 const railPreviewEl = $("rail-preview");
@@ -595,7 +595,7 @@ groupToolsEl.checked = composerPrefs.groupTools;
 showTimestampsEl.checked = composerPrefs.showTimestamps;
 showRailEl.checked = composerPrefs.showRail;
 combineQueuedEl.checked = composerPrefs.combineQueued;
-themePrefEl.value = themePref;
+syncThemePrefUi(themePref);
 cancelSubagentsPrefEl.value = parseCancelSubagentsPref(
   localStorage.getItem(CANCEL_SUBAGENTS_PREF_KEY),
 );
@@ -4849,9 +4849,16 @@ function slashPopoverOpen(): boolean {
   return !slashMenu.hidden || !slashPicker.hidden;
 }
 
+function syncThemePrefUi(pref: "auto" | "dark" | "light") {
+  for (const btn of themePrefEl.querySelectorAll<HTMLButtonElement>("[data-theme-pref]")) {
+    const id = btn.dataset.themePref;
+    btn.setAttribute("aria-selected", id === pref ? "true" : "false");
+  }
+}
+
 function applyThemeChoice(pref: "auto" | "dark" | "light", persist: boolean) {
   themePref = pref;
-  themePrefEl.value = pref;
+  syncThemePrefUi(pref);
   applyTheme(pref);
   if (persist) persistThemePref(pref, localStorage);
 }
@@ -5559,11 +5566,11 @@ combineQueuedEl.addEventListener("change", () => {
   composerPrefs.combineQueued = combineQueuedEl.checked;
   persistComposerPrefs(composerPrefs, localStorage);
 });
-themePrefEl.addEventListener("change", () => {
-  const next = themePrefEl.value;
-  themePref = next === "dark" || next === "light" ? next : "auto";
-  persistThemePref(themePref, localStorage);
-  applyTheme(themePref);
+themePrefEl.addEventListener("click", (ev) => {
+  const btn = ev.target instanceof Element ? ev.target.closest("[data-theme-pref]") : null;
+  if (!(btn instanceof HTMLButtonElement)) return;
+  const next = btn.dataset.themePref;
+  if (next === "auto" || next === "dark" || next === "light") applyThemeChoice(next, true);
 });
 window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
   if (themePref === "auto") applyTheme(themePref);

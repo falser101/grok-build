@@ -439,14 +439,14 @@
             cwd
             <input id="cwd" spellcheck="false" autocomplete="off" />
           </label>
-          <label class="grow">
-            外观
-            <select id="theme-pref">
-              <option value="auto">跟随系统</option>
-              <option value="dark">深色</option>
-              <option value="light">浅色</option>
-            </select>
-          </label>
+          <div class="grow theme-pref-field">
+            <span class="theme-pref-label">外观</span>
+            <div id="theme-pref" class="mode-seg theme-seg" role="radiogroup" aria-label="外观">
+              <button type="button" data-theme-pref="auto">跟随系统</button>
+              <button type="button" data-theme-pref="dark">深色</button>
+              <button type="button" data-theme-pref="light">浅色</button>
+            </div>
+          </div>
           <label class="check">
             <input id="enter-sends" type="checkbox" checked />
             Enter 发送（关闭则 Ctrl+Enter 发送）

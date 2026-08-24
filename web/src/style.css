@@ -178,7 +178,7 @@ body {
 
 #sidebar-resizer:hover,
 #app.is-resizing #sidebar-resizer {
-  background: #ffffff18;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
 }
 
 #app[data-sidebar="collapsed"] #sidebar-resizer {
@@ -655,12 +655,21 @@ body {
   font-size: 1.05rem;
 }
 
-.settings-panel label {
+.settings-panel label,
+.theme-pref-field {
   display: flex;
   flex-direction: column;
   gap: 0.28rem;
   font-size: 0.78rem;
   color: var(--muted);
+}
+
+.theme-seg {
+  width: 100%;
+}
+
+.theme-seg button {
+  flex: 1 1 0;
 }
 
 .surface.overlay {
@@ -827,14 +836,14 @@ button:disabled {
 .banner {
   margin: 0;
   padding: 0.45rem 1.15rem;
-  background: #2a1614;
-  color: #f0c2ba;
+  background: color-mix(in srgb, var(--danger) 16%, var(--bg));
+  color: var(--danger);
   font-size: 0.84rem;
 }
 
 .banner.warn {
-  background: #241e12;
-  color: #d8c9a4;
+  background: color-mix(in srgb, var(--edit) 16%, var(--bg));
+  color: var(--edit);
 }
 
 .thread {
@@ -2205,7 +2214,7 @@ code {
 
 .status-pending,
 .status-in_progress {
-  color: #cfcfcf;
+  color: var(--muted);
 }
 
 .status-failed,
@@ -2817,7 +2826,7 @@ html[data-theme="light"] .ansi-cyan { color: #0e7474; }
   position: absolute;
   left: 0.35rem;
   top: 0.2rem;
-  color: #ffffff44;
+  color: color-mix(in srgb, var(--ink) 28%, transparent);
   pointer-events: none;
   white-space: pre-wrap;
 }
@@ -4381,6 +4390,7 @@ html[data-compact="1"] #sidebar #btn-new {
   border-radius: 999px;
   overflow: hidden;
   flex: 0 0 auto;
+  background: var(--bg-3);
 }
 .mode-seg button {
   border: 0;

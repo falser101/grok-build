@@ -2463,6 +2463,13 @@ label.check input {
   width: auto;
 }
 
+label.check .check-hint {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 400;
+}
+
 #btn-stop {
   border: 0;
   border-radius: 999px;
@@ -3227,26 +3234,20 @@ mark.find-hit {
 
 
 
-html[data-compact="1"] {
-  --gutter: 0.7rem;
-  --radius: 6px;
-  --sidebar-width: 220px;
+html[data-compact="1"] #thread {
+  gap: 0.55rem;
+  padding-top: 0.65rem;
+  padding-bottom: 1rem;
 }
 
-html[data-compact="1"] #main-header,
-html[data-compact="1"] #composer,
 html[data-compact="1"] .bubble {
-  padding-top: 0.4rem;
-  padding-bottom: 0.4rem;
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+  line-height: 1.45;
 }
 
-html[data-compact="1"] .slash-row,
-html[data-compact="1"] .history-row {
-  padding: 0.28rem 0.55rem;
-}
-
-html[data-compact="1"] #sidebar #btn-new {
-  padding: 0.4rem 0.65rem;
+html[data-compact="1"] .bubble .who {
+  margin-bottom: 0.12rem;
 }
 
 .header-left,

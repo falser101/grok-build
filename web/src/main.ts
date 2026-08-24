@@ -294,6 +294,7 @@ const btnStop = $<HTMLButtonElement>("btn-stop");
 const btnFollow = $<HTMLButtonElement>("btn-follow");
 const btnExpandAll = $<HTMLButtonElement>("btn-expand-all");
 const btnCollapseAll = $<HTMLButtonElement>("btn-collapse-all");
+const compactModeEl = $<HTMLInputElement>("compact-mode");
 const enterSendsEl = $<HTMLInputElement>("enter-sends");
 const showThinkingEl = $<HTMLInputElement>("show-thinking");
 const groupToolsEl = $<HTMLInputElement>("group-tools");
@@ -431,6 +432,7 @@ let themePref = loadThemePref(localStorage);
 applyTheme(themePref);
 let compactModeOn = loadCompactMode(localStorage);
 applyCompactMode(compactModeOn, document.documentElement, localStorage);
+compactModeEl.checked = compactModeOn;
 let queuePinned = false;
 let queueSelectedId: string | null = null;
 let hashSyncing = false;
@@ -3252,6 +3254,7 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
   if (name === "compact-mode") {
     compactModeOn = !compactModeOn;
     applyCompactMode(compactModeOn, document.documentElement, localStorage);
+    compactModeEl.checked = compactModeOn;
     showBanner(compactModeOn ? "已开紧凑模式" : "已关紧凑模式", "compact-mode");
     return true;
   }
@@ -3259,7 +3262,7 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
     const named = parseThemeArg(args);
     const next = named ?? nextThemePref(themePref);
     applyThemeChoice(next, true);
-    const labels = { auto: "跟随系统", dark: "深色", light: "浅色" } as const;
+    const labels = { auto: "跟随系统", dark: "深", light: "浅" } as const;
     showBanner(`外观：${labels[next]}`, "theme");
     return true;
   }
@@ -5433,6 +5436,10 @@ btnCollapseAll.addEventListener("click", () => {
   syncThread();
 });
 
+compactModeEl.addEventListener("change", () => {
+  compactModeOn = compactModeEl.checked;
+  applyCompactMode(compactModeOn, document.documentElement, localStorage);
+});
 enterSendsEl.addEventListener("change", () => {
   composerPrefs.enterSends = enterSendsEl.checked;
   persistComposerPrefs(composerPrefs, localStorage);

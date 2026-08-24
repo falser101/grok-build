@@ -14,7 +14,7 @@
 | V-10 | NO_COLOR | 单色 | 尊重；Web 少见 | 否（N/A） |
 | V-11 | 颜色量化 | 启动按 16/256/truecolor | 不需要 | 否（N/A） |
 | V-12 | 光标 OSC 12 | 会话中改终端光标为 accent_user，退出 OSC 112 | CSS caret-color | 是：CSS caret-color |
-| V-13 | Compact mode | `/compact-mode`，≤20 行自动开 | `--density compact` | 是：`/compact-mode` 开关 `data-compact` + `grok-web.compact-mode` |
+| V-13 | Compact mode | `/compact-mode`，≤20 行自动开 | `--density compact` | 是：设置模态开关 + `/compact-mode` 同一套，只加密会话区。 |
 | V-14 | 主题槽 | bg_*、accent_*、text、gray、semantic、border、paste、diff、md_* | 一份 tokens.css | 是：style.css 变量；思考/工具/composer/侧栏走 token |
 | V-15 | 语法 tmTheme | 三套内置 | shiki 映射 | 部分：轻量 tokenizer。**备注：不引入 shiki。** |
 | V-16 | screen_mode | fullscreen/minimal 默认，restart | Web 单一 DOM | 否（N/A） |

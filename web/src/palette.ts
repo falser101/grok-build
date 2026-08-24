@@ -51,17 +51,19 @@ export type ShortcutRow = {
 };
 
 export const APP_SHORTCUTS: ShortcutRow[] = [
-  { id: "palette", keys: "Ctrl+P", title: "命令面板", run: "palette" },
-  { id: "shortcuts", keys: "?", title: "快捷键", run: "shortcuts" },
-  { id: "shortcuts-dot", keys: "Ctrl+.", title: "快捷键帮助", run: "shortcuts" },
+  { id: "send-now", keys: "Ctrl+Enter", title: "立即发送", run: "send-now" },
+  { id: "mode", keys: "Shift+Tab", title: "模式", run: "mode" },
+  { id: "queue", keys: "Ctrl+;", title: "队列", run: "queue" },
   { id: "settings", keys: "Ctrl+,", title: "设置", run: "settings" },
+  { id: "dashboard", keys: "Ctrl+\\", title: "Dashboard", run: "dashboard" },
+  { id: "shortcuts", keys: "?", title: "速查", run: "shortcuts" },
+  { id: "shortcuts-dot", keys: "Ctrl+.", title: "速查", run: "shortcuts" },
+  { id: "palette", keys: "Ctrl+P", title: "命令面板", run: "palette" },
+  { id: "esc", keys: "Esc", title: "关浮层 / Stop / 清输入 / rewind", run: "esc" },
   { id: "model", keys: "Ctrl+M", title: "模型", run: "model" },
   { id: "enter", keys: "Enter", title: "发送 / 执行 slash", run: "enter" },
   { id: "tab", keys: "Tab", title: "补全 slash（不执行）", run: "tab" },
   { id: "newline", keys: "Shift+Enter", title: "换行", run: "newline" },
-  { id: "send-now", keys: "Ctrl+Enter", title: "立即发送", run: "send-now" },
-  { id: "queue", keys: "Ctrl+;", title: "打开队列", run: "queue" },
-  { id: "esc", keys: "Esc", title: "关闭浮层", run: "esc" },
 ];
 
 /** Palette 快捷键组：少量可搜条目，避免刷屏。 */
@@ -331,7 +333,7 @@ export function mapGlobalHotkey(
   if (cmd && (key === "p" || key === "P")) return "palette";
   if (cmd && key === ",") return "settings";
   if (key === "F2" && !typing) return "settings";
-  if (cmd && (key === "m" || key === "M") && !typing) return "model";
+  if (cmd && (key === "m" || key === "M")) return "model";
   if (!typing && key === "?") return "shortcuts";
   if (!typing && cmd && key === ".") return "shortcuts";
   if (cmd && key === ";") return "queue";

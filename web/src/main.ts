@@ -124,7 +124,7 @@ import {
   turnStatusLabel,
   type PaletteItem,
 } from "./palette";
-import { nextEscAction, type EscArm } from "./esc";
+import { firstOpenEscOverlay, nextEscAction, type EscArm } from "./esc";
 import {
   LATER_TOAST,
   applyCompactMode,
@@ -1728,6 +1728,7 @@ acp.onNotification = (method, params) => {
 };
 
 let canceling = false;
+let lastCancelSubagents = true;
 let lastEscArm: EscArm = null;
 const blockHost = new BlockHost(blockCard, blockPill, {
   onYolo: () => setYoloMode(true),
@@ -1762,6 +1763,7 @@ function notifySessionCancel(cancelSubagents: boolean) {
 
 function stopTurn(cancelSubagents: boolean) {
   if (!sessionId) return;
+  lastCancelSubagents = cancelSubagents;
   notifySessionCancel(cancelSubagents);
   turnRunning = false;
   canceling = true;
@@ -5641,17 +5643,20 @@ promptEl.addEventListener("blur", () => {
 thread.addEventListener("focusin", () => syncComposerHint());
 
 function firstEscOverlay(): string | null {
-  if (!$("image-lightbox").hidden) return "lightbox";
-  if (!settingsModal.hidden) return "settings";
-  if (!appDialog.hidden) return "appDialog";
-  if (!actionModal.hidden) return "actionModal";
-  if (!findBar.hidden) return "findBar";
-  if (!jumpPanel.hidden) return "jumpPanel";
-  if (!helpCard.hidden) return "helpCard";
-  if (slashPopoverOpen() || !promptHistoryEl.hidden || !atMenu.hidden) return "composer";
-  if (!sessionPopover.hidden) return "sessionPopover";
-  const btw = timeline.items.find((it) => it.kind === "btw" && it.open !== false);
-  if (btw) return "btw";
+  const overlay = firstOpenEscOverlay({
+    lightbox: !$("image-lightbox").hidden,
+    settings: !settingsModal.hidden,
+    appDialog: !appDialog.hidden,
+    actionModal: !actionModal.hidden,
+    find: !findBar.hidden,
+    jump: !jumpPanel.hidden,
+    help: !helpCard.hidden,
+    slash: slashPopoverOpen() || !atMenu.hidden,
+    history: !promptHistoryEl.hidden,
+    sessionPopover: !sessionPopover.hidden,
+    btw: Boolean(timeline.items.find((it) => it.kind === "btw" && it.open !== false)),
+  });
+  if (overlay) return overlay;
   if (app.dataset.surface === "dashboard") {
     if (dashQuery) return "dash-search";
     if (dashSelectedId) return "dash-select";
@@ -5664,11 +5669,13 @@ function closeEscOverlay(id: string) {
   else if (id === "settings") closeSettings();
   else if (id === "appDialog") closeAppDialog();
   else if (id === "actionModal") closeAction();
-  else if (id === "findBar") findBar.hidden = true;
-  else if (id === "jumpPanel") jumpPanel.hidden = true;
-  else if (id === "helpCard") closeHelpCard();
-  else if (id === "composer") {
+  else if (id === "find") findBar.hidden = true;
+  else if (id === "jump") jumpPanel.hidden = true;
+  else if (id === "help") closeHelpCard();
+  else if (id === "slash") {
     closeSlashPicker(true);
+    hidePopovers();
+  } else if (id === "history") {
     hidePopovers();
   } else if (id === "sessionPopover") closeSessionPopover();
   else if (id === "btw") {
@@ -5722,21 +5729,25 @@ document.addEventListener(
       return;
     }
     if (action.type === "recancel") {
-      notifySessionCancel(true);
+      notifySessionCancel(lastCancelSubagents);
       return;
     }
     if (action.type === "arm-clear") {
       lastEscArm = { kind: "clear", at: Date.now() };
+      showBanner("再按 Esc 清空输入（1 秒）", "esc");
       return;
     }
     if (action.type === "clear") {
       lastEscArm = null;
       promptEl.value = "";
       hidePopovers();
+      syncComposerFilled();
+      syncComposerHint();
       return;
     }
     if (action.type === "arm-rewind") {
       lastEscArm = { kind: "rewind", at: Date.now() };
+      showBanner("再按 Esc 撤回上一轮（1 秒）", "esc");
       return;
     }
     if (action.type === "rewind") {
@@ -6039,6 +6050,7 @@ window.__grokWebTest = {
   queueTexts: () => localQueue.map((q) => q.text),
   setTurnRunning: (value) => {
     turnRunning = value;
+    if (value) canceling = false;
     syncTurnButtons();
     syncTurnStatus();
   },

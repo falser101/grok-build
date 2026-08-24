@@ -3234,6 +3234,18 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
     openSettings();
     return true;
   }
+  if (name === "usage") {
+    if (!entry) {
+      showBanner("打开一场会话后再看用量", "usage");
+      return true;
+    }
+    await showContext(entry);
+    return true;
+  }
+  if (name === "privacy") {
+    openSettings();
+    return true;
+  }
   if (name === "share") {
     if (!entry) {
       showBanner(LATER_TOAST, "slash-later");
@@ -4351,7 +4363,8 @@ async function acceptPalette(item: PaletteItem) {
     return;
   }
   closeAppDialog();
-  await submitComposer({ text: `/${cmd.name}` });
+  const handled = await runLocalSlash({ name: cmd.name, args: "" });
+  if (!handled) await sendPrompt(`/${cmd.name}`);
 }
 
 btnSettings.addEventListener("click", () => openSettings());
@@ -5722,7 +5735,10 @@ document.addEventListener("keydown", (ev) => {
   if (action === "palette") openPalette();
   else if (action === "settings") openSettings();
   else if (action === "model") openModelPicker();
-  else openShortcutsHelp();
+  else if (action === "queue") {
+    queuePinned = !queuePinned;
+    renderQueue();
+  } else openShortcutsHelp();
 });
 railPreviewEl.addEventListener("click", () => {
   const id = railPreviewEl.dataset.id;

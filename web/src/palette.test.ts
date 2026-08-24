@@ -98,4 +98,5 @@ test("global hotkeys do not invent commands", () => {
   assert.equal(mapGlobalHotkey(".", { ...none, ctrl: true }, false), "shortcuts");
   assert.equal(mapGlobalHotkey("m", { ...none, ctrl: true }, false), "model");
   assert.equal(mapGlobalHotkey("m", { ...none, ctrl: true }, true), null);
+  assert.equal(mapGlobalHotkey(";", { ...none, ctrl: true }, true), "queue");
 });

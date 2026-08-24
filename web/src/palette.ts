@@ -61,6 +61,7 @@ export const APP_SHORTCUTS: ShortcutRow[] = [
   { id: "tab", keys: "Tab", title: "补全 slash（不执行）", run: "tab" },
   { id: "newline", keys: "Shift+Enter", title: "换行", run: "newline" },
   { id: "send-now", keys: "Ctrl+Enter", title: "立即发送", run: "send-now" },
+  { id: "queue", keys: "Ctrl+;", title: "打开队列", run: "queue" },
   { id: "esc", keys: "Esc", title: "关闭浮层", run: "esc" },
 ];
 
@@ -327,6 +328,7 @@ export type GlobalHotkey =
   | "settings"
   | "model"
   | "shortcuts"
+  | "queue"
   | null;
 
 export function mapGlobalHotkey(
@@ -341,5 +343,6 @@ export function mapGlobalHotkey(
   if (cmd && (key === "m" || key === "M") && !typing) return "model";
   if (!typing && key === "?") return "shortcuts";
   if (!typing && cmd && (key === "." || key === "x" || key === "X")) return "shortcuts";
+  if (cmd && key === ";") return "queue";
   return null;
 }

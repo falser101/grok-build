@@ -48,7 +48,9 @@ export type LocalAction =
   | "recap"
   | "doctor"
   | "cd"
-  | "dashboard";
+  | "dashboard"
+  | "usage"
+  | "privacy";
 
 export type SlashPlan =
   | { kind: "local"; name: LocalAction; args: string }
@@ -154,6 +156,8 @@ const LOCAL_ACTIONS = new Set<string>([
   "doctor",
   "cd",
   "dashboard",
+  "usage",
+  "privacy",
 ]);
 
 /** Always-on S commands: send `/name` via session/prompt (pager does not consume these). */
@@ -249,6 +253,8 @@ export const LOCAL_SLASH: SlashCommand[] = [
   { name: "recap", description: "回顾会话", argumentHint: null },
   { name: "doctor", description: "连接诊断", argumentHint: null },
   { name: "cd", description: "更改 cwd", argumentHint: "path" },
+  { name: "usage", description: "这次对话用了多少", argumentHint: null },
+  { name: "privacy", description: "编码数据与隐私", argumentHint: null },
   { name: "btw", description: "旁路提问", argumentHint: "question" },
   { name: "compact", description: "压缩上下文（发给 Agent）", argumentHint: "note" },
   { name: "hooks", description: "这一档不做", argumentHint: null },

@@ -196,6 +196,14 @@ test("header does not show model chip or session tools", async ({ page }) => {
   await expect(page.locator("#composer #btn-model-chip")).toBeVisible();
 });
 
+test("Ctrl+; pins the queue pane", async ({ page }) => {
+  await page.goto("/?noconnect=1");
+  await expect(page.locator("#queue-strip")).toBeHidden();
+  await page.keyboard.press("Control+Semicolon");
+  await expect(page.locator("#queue-strip")).toBeVisible();
+  await expect(page.locator("#queue-strip")).toContainText("队列为空");
+});
+
 test("session overflow menu sits next to the title", async ({ page }) => {
   await page.goto("/?noconnect=1");
   await page.evaluate(() => {

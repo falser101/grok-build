@@ -60,6 +60,9 @@ test("planSlash classifies local, send, later, forbidden", () => {
   assert.equal(planSlash("/share").kind, "local");
   assert.equal(planSlash("not a slash").kind, "pass");
   assert.deepEqual(planSlash("/dashboard"), { kind: "local", name: "dashboard", args: "" });
+  assert.deepEqual(planSlash("/usage"), { kind: "local", name: "usage", args: "" });
+  assert.deepEqual(planSlash("/privacy"), { kind: "local", name: "privacy", args: "" });
+  assert.deepEqual(planSlash("/cost"), { kind: "local", name: "usage", args: "" });
   assert.deepEqual(planSlash("/sessions"), { kind: "local", name: "dashboard", args: "" });
   assert.deepEqual(planSlash("/agents-dashboard"), { kind: "local", name: "dashboard", args: "" });
 });

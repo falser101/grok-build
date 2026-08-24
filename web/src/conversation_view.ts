@@ -104,9 +104,20 @@ function wantsReplyFeedback(item: TimelineItem): boolean {
   return item.kind === "agent" && Boolean((item.text || item.raw || "").trim());
 }
 
+function replyFeedbackState(item: TimelineItem): "pending" | "reasons" | "sent" {
+  if (item.feedback === "sent" || item.status === "sent") return "sent";
+  if (item.feedback === "reasons") return "reasons";
+  return "pending";
+}
+
 function ensureReplyFeedback(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers): boolean {
   if (!wantsReplyFeedback(item)) return true;
-  if (el.querySelector(":scope > .feedback-block")) return true;
+  const want = replyFeedbackState(item);
+  const existing = el.querySelector(":scope > .feedback-block") as HTMLElement | null;
+  if (existing) {
+    if (existing.dataset.state === want) return true;
+    existing.remove();
+  }
   if (!item.feedback) item.feedback = "pending";
   el.append(feedbackActions(item, handlers, () => fill(el, item, handlers)));
   return true;
@@ -509,6 +520,7 @@ function feedbackActions(
   const wrap = document.createElement("div");
   wrap.className = "feedback-block";
   const sent = item.feedback === "sent" || item.status === "sent";
+  wrap.dataset.state = sent ? "sent" : item.feedback === "reasons" ? "reasons" : "pending";
   if (sent) {
     const thanks = document.createElement("p");
     thanks.className = "feedback-prompt";

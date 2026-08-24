@@ -1253,3 +1253,46 @@ export function isReplayMeta(params: Json): boolean {
   const meta = asRecord((rec?._meta as Json) ?? (rec?.meta as Json) ?? null);
   return meta?.isReplay === true || meta?.is_replay === true;
 }
+
+
+/** 0-based count of user messages before `itemId` (for x.ai/feedback turn_number). */
+export function replyFeedbackTurnNumber(items: TimelineItem[], itemId: string): number {
+  let n = 0;
+  for (const it of items) {
+    if (it.id === itemId) return n;
+    if (it.kind === "user") n += 1;
+  }
+  return n;
+}
+
+/**
+ * Params the existing `x.ai/feedback` handler already accepts.
+ * Fallback `FeedbackRequest` is snake_case (`session_id` + `feedback_text`).
+ * Do not invent a solicited `request_id` (that marks FeedbackRequest cards).
+ */
+export function replyFeedbackParams(
+  sessionId: string,
+  text: string,
+  item: Pick<TimelineItem, "id" | "eventId" | "source">,
+  items: TimelineItem[] = [],
+): { [k: string]: Json } {
+  const params: { [k: string]: Json } = {
+    sessionId,
+    session_id: sessionId,
+    feedbackText: text,
+    feedback_text: text,
+    messageId: item.id,
+    itemId: item.id,
+    turn_number: replyFeedbackTurnNumber(items, item.id),
+  };
+  if (item.eventId) {
+    params.eventId = item.eventId;
+    params.event_id = item.eventId;
+  }
+  const requestId = item.source?.requestId;
+  if (typeof requestId === "string" && requestId) {
+    params.requestId = requestId;
+    params.request_id = requestId;
+  }
+  return params;
+}

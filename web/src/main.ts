@@ -53,7 +53,7 @@ import {
   type SessionListEntry,
   type StartupAuthDecision,
 } from "./startup";
-import { ConversationTimeline, isTurnTerminalKind, railPreview } from "./conversation";
+import { ConversationTimeline, isTurnTerminalKind, railPreview, replyFeedbackParams } from "./conversation";
 import { enhanceMermaid, patchTimelineItem, renderTimelineItem } from "./conversation_view";
 import {
   EFFORT_OPTIONS,
@@ -1170,12 +1170,13 @@ const itemHandlers = {
     timeline.mark(item);
     syncThread();
     if (!sessionId) return;
-    const params: { [k: string]: Json } = { sessionId, feedbackText: text };
-    const requestId = item.source?.requestId;
-    if (typeof requestId === "string" && requestId) params.requestId = requestId;
-    acp.request("x.ai/feedback", params).catch(() => {
-      showBanner("反馈没发出去", "feedback");
-    });
+    const params = replyFeedbackParams(sessionId, text, item, timeline.items);
+    const send = () => acp.request("x.ai/feedback", params);
+    send().catch(() =>
+      send().catch(() => {
+        showBanner("反馈没发出去", "feedback");
+      }),
+    );
   },
   onSelect: (item: (typeof timeline.items)[number]) => {
     timeline.select(item.id);

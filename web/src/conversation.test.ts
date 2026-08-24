@@ -6,6 +6,7 @@ import {
   formatCompactTokens,
   isReplayMeta,
   railPreview,
+  replyFeedbackParams,
   textFromContent,
 } from "./conversation.ts";
 
@@ -834,4 +835,38 @@ test("tool args persist when complete update drops rawInput", () => {
   assert.ok(t.items[0]?.argText?.includes("b.txt"));
   assert.match(t.items[0]?.html ?? "", /tool-args/);
   assert.equal(t.items[0]?.elapsedMs, 1500);
+});
+
+
+test("replyFeedbackParams sends snake+camel and reply ids, never a fake request_id", () => {
+  const t = new ConversationTimeline();
+  t.insertUser("hi");
+  t.apply("session/update", {
+    update: { sessionUpdate: "agent_message_chunk", content: { text: "ok" } },
+    _meta: { eventId: "evt-9" },
+  });
+  const agent = t.items.find((it) => it.kind === "agent");
+  assert.ok(agent);
+  const params = replyFeedbackParams("sess-1", "helpful", agent, t.items);
+  assert.equal(params.sessionId, "sess-1");
+  assert.equal(params.session_id, "sess-1");
+  assert.equal(params.feedbackText, "helpful");
+  assert.equal(params.feedback_text, "helpful");
+  assert.equal(params.eventId, "evt-9");
+  assert.equal(params.event_id, "evt-9");
+  assert.equal(params.messageId, agent.id);
+  assert.equal(params.itemId, agent.id);
+  assert.equal(params.turn_number, 1);
+  assert.equal(params.requestId, undefined);
+  assert.equal(params.request_id, undefined);
+
+  const card = {
+    id: "feedback-1",
+    eventId: "evt-card",
+    source: { requestId: "fb-req-1" },
+  };
+  const solicited = replyFeedbackParams("sess-1", "inaccurate", card, []);
+  assert.equal(solicited.requestId, "fb-req-1");
+  assert.equal(solicited.request_id, "fb-req-1");
+  assert.equal(solicited.event_id, "evt-card");
 });

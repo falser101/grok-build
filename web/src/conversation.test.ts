@@ -5,6 +5,7 @@ import {
   formatCompactElapsed,
   formatCompactTokens,
   isReplayMeta,
+  listSubagentTasks,
   railPreview,
   replyFeedbackParams,
   textFromContent,
@@ -415,6 +416,49 @@ test("subagent progress updates the spawned row", () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0]?.activity, "Reading style.css");
   assert.equal(rows[0]?.subType, "explore");
+});
+
+test("subagent finished keeps output on the same row", () => {
+  const t = new ConversationTimeline();
+  t.apply("session/update", {
+    update: {
+      sessionUpdate: "subagent_spawned",
+      childSessionId: "child-2",
+      description: "look around",
+      subagentType: "general",
+      status: "running",
+    },
+  });
+  t.apply("session/update", {
+    update: {
+      sessionUpdate: "subagent_finished",
+      child_session_id: "child-2",
+      status: "completed",
+      output: "found two files",
+    },
+  });
+  const row = t.items.find((i) => i.kind === "subagent");
+  assert.equal(row?.title, "look around");
+  assert.equal(row?.status, "completed");
+  assert.equal(row?.raw, "found two files");
+  assert.equal(row?.open, false);
+});
+
+test("listSubagentTasks is empty without live rows and does not invent names", () => {
+  assert.deepEqual(listSubagentTasks([]), []);
+  const t = new ConversationTimeline();
+  t.apply("session/update", {
+    update: {
+      sessionUpdate: "subagent_spawned",
+      childSessionId: "only-live",
+      description: "from event",
+      subagentType: "plan",
+      status: "running",
+    },
+  });
+  assert.deepEqual(listSubagentTasks(t.items), [
+    { type: "plan", status: "running", description: "from event" },
+  ]);
 });
 
 test("runningSubagentCount ignores finished and workflow children", () => {

@@ -58,6 +58,7 @@ test("planSlash classifies local, send, later, forbidden", () => {
   assert.deepEqual(planSlash("/vim-mode"), { kind: "forbidden", name: "vim-mode" });
   assert.deepEqual(planSlash("/skills"), { kind: "local", name: "skills", args: "" });
   assert.deepEqual(planSlash("/mcps"), { kind: "local", name: "mcps", args: "" });
+  assert.deepEqual(planSlash("/tasks"), { kind: "local", name: "tasks", args: "" });
   assert.equal(planSlash("/imagine").kind, "later");
   assert.equal(planSlash("/settings").kind, "local");
   assert.equal(planSlash("/share").kind, "local");

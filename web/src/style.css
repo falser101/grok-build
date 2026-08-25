@@ -1163,8 +1163,49 @@ button:disabled {
   opacity: 0.75;
 }
 
-.bubble.tool[data-open="1"] .tool-line::before {
+.bubble.tool[data-open="1"] .tool-line::before,
+.bubble.subagent[data-open="1"] .tool-line::before {
   content: "▾";
+}
+
+.bubble.subagent .tool-line::before {
+  content: "▸";
+  font-size: 0.68rem;
+  opacity: 0.75;
+}
+
+.subagent-output {
+  margin: 0.35rem 0 0;
+  white-space: pre-wrap;
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.task-row {
+  display: grid;
+  grid-template-columns: 6rem 6rem minmax(0, 1fr);
+  gap: 0.6rem;
+  padding: 0.38rem 0.1rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.86rem;
+}
+
+.task-head {
+  color: var(--muted);
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.task-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tool-line[data-busy="1"]::after {

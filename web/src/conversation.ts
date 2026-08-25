@@ -872,6 +872,7 @@ export class ConversationTimeline {
       existing.status = snap.status || existing.status;
       existing.activity = snap.activity || existing.activity;
       existing.subType = snap.subType || existing.subType;
+      if (snap.output) existing.raw = snap.output;
       if (snap.workflowRunId) existing.runId = snap.workflowRunId;
       existing.eventId = eventId ?? existing.eventId;
       this.mark(existing);
@@ -888,13 +889,14 @@ export class ConversationTimeline {
       eventId,
       replay,
       timestamp: Date.now(),
-      raw: snap.description,
+      raw: snap.output,
       title: snap.title,
       status: snap.status,
       childSessionId: snap.childSessionId || undefined,
       activity: snap.activity || undefined,
       subType: snap.subType || undefined,
       runId: snap.workflowRunId || undefined,
+      open: false,
     });
   }
 
@@ -976,6 +978,20 @@ export class ConversationTimeline {
   private byId(id: string): TimelineItem | null {
     return this.items.find((it) => it.id === id) ?? null;
   }
+}
+
+export function listSubagentTasks(items: TimelineItem[]): {
+  type: string;
+  status: string;
+  description: string;
+}[] {
+  return items
+    .filter((it) => it.kind === "subagent")
+    .map((it) => ({
+      type: it.subType || "",
+      status: it.status || "",
+      description: it.title || it.text || "",
+    }));
 }
 
 export function isLiveSubagent(item: TimelineItem): boolean {

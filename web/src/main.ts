@@ -53,7 +53,7 @@ import {
   type SessionListEntry,
   type StartupAuthDecision,
 } from "./startup";
-import { ConversationTimeline, isTurnTerminalKind, railPreview, replyFeedbackParams } from "./conversation";
+import { ConversationTimeline, isTurnTerminalKind, listSubagentTasks, railPreview, replyFeedbackParams } from "./conversation";
 import { enhanceMermaid, patchTimelineItem, renderTimelineItem } from "./conversation_view";
 import {
   EFFORT_OPTIONS,
@@ -474,7 +474,7 @@ let dashDeleteArmed: { id: string; at: number } | null = null;
 let paletteItems: PaletteItem[] = [];
 let paletteIndex = 0;
 let paletteQuery = "";
-type AppDialogKind = "palette" | "shortcuts" | "args" | "later" | "block" | "sheet" | "extensions" | null;
+type AppDialogKind = "palette" | "shortcuts" | "args" | "later" | "block" | "sheet" | "extensions" | "tasks" | null;
 let appDialogKind: AppDialogKind = null;
 timeline.opts.showThinking = composerPrefs.showThinking;
 timeline.opts.groupTools = composerPrefs.groupTools;
@@ -3382,6 +3382,10 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
     void openExtensions("mcps");
     return true;
   }
+  if (name === "tasks") {
+    openTasks();
+    return true;
+  }
   if (name === "usage") {
     await showUsage(entry);
     return true;
@@ -4451,6 +4455,45 @@ function paintExtensions(tab: "skills" | "mcps", skills: SkillRow[], mcps: McpRo
 async function openExtensions(tab: "skills" | "mcps") {
   const [skills, mcps] = await Promise.all([fetchSkillRows(), fetchMcpRows()]);
   paintExtensions(tab, skills, mcps);
+}
+
+function openTasks() {
+  appDialogBody.replaceChildren();
+  const rows = listSubagentTasks(timeline.items);
+  const table = document.createElement("div");
+  table.className = "task-list";
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "ext-empty";
+    empty.textContent = "还没有";
+    table.append(empty);
+  } else {
+    const head = document.createElement("div");
+    head.className = "task-row task-head";
+    for (const label of ["类型", "状态", "描述"]) {
+      const cell = document.createElement("span");
+      cell.textContent = label;
+      head.append(cell);
+    }
+    table.append(head);
+    for (const row of rows) {
+      const line = document.createElement("div");
+      line.className = "task-row";
+      const type = document.createElement("span");
+      type.textContent = row.type;
+      const status = document.createElement("span");
+      status.textContent = row.status;
+      const desc = document.createElement("span");
+      desc.textContent = row.description;
+      line.append(type, status, desc);
+      table.append(line);
+    }
+  }
+  const foot = document.createElement("p");
+  foot.className = "shortcut-foot";
+  foot.textContent = "Esc 关闭";
+  appDialogBody.append(table, foot);
+  showAppDialog("任务", "tasks");
 }
 
 function closeSettings() {

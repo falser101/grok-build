@@ -819,6 +819,7 @@ export function subagentSnapshot(
   status: string;
   title: string;
   workflowRunId: string;
+  output: string;
 } {
   const childSessionId =
     str(update.childSessionId) ||
@@ -827,7 +828,7 @@ export function subagentSnapshot(
     str(update.subagent_id) ||
     str(update.sessionId);
   const description =
-    str(update.description) || str(update.title) || contentText || kind.replace(/_/g, " ");
+    str(update.description) || str(update.title) || contentText;
   const subType =
     str(update.subagentType) || str(update.subagent_type) || str(update.type) || str(update.agentType);
   const activity =
@@ -843,6 +844,7 @@ export function subagentSnapshot(
     else if (kind.includes("progress") || kind.includes("spawn")) status = "running";
   }
   const workflowRunId = str(update.workflowRunId) || str(update.workflow_run_id);
+  const output = str(update.output) || str(update.error);
   return {
     childSessionId,
     description,
@@ -851,5 +853,6 @@ export function subagentSnapshot(
     status,
     title: description,
     workflowRunId,
+    output,
   };
 }

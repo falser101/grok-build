@@ -52,7 +52,8 @@ export type LocalAction =
   | "usage"
   | "privacy"
   | "skills"
-  | "mcps";
+  | "mcps"
+  | "tasks";
 
 export type SlashPlan =
   | { kind: "local"; name: LocalAction; args: string }
@@ -109,7 +110,6 @@ const LATER = new Set([
   "plugins",
   "marketplace",
   "workflows",
-  "tasks",
   "voice",
   "import-claude",
   "personas",
@@ -160,6 +160,7 @@ const LOCAL_ACTIONS = new Set<string>([
   "privacy",
   "skills",
   "mcps",
+  "tasks",
 ]);
 
 /** Always-on S commands: send `/name` via session/prompt (pager does not consume these). */
@@ -273,7 +274,7 @@ export const LOCAL_SLASH: SlashCommand[] = [
   { name: "mcps", description: "MCP", argumentHint: null },
   { name: "dashboard", description: "运行中会话", argumentHint: null },
   { name: "workflows", description: "这一档不做", argumentHint: null },
-  { name: "tasks", description: "这一档不做", argumentHint: null },
+  { name: "tasks", description: "任务", argumentHint: null },
   { name: "voice", description: "这一档不做", argumentHint: null },
   { name: "import-claude", description: "这一档不做", argumentHint: null },
   { name: "personas", description: "这一档不做", argumentHint: null },

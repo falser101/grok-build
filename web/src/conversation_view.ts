@@ -412,36 +412,44 @@ function fillWorkflow(el: HTMLElement, item: TimelineItem, handlers: ItemHandler
 }
 
 function fillSubagent(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
-  el.onclick = () => handlers.onSelect(item);
+  el.dataset.open = item.open ? "1" : "0";
   if (item.status) el.dataset.status = item.status;
-  const who = document.createElement("span");
-  who.className = "who";
+  const line = document.createElement("button");
+  line.type = "button";
+  line.className = "tool-line";
   if (item.subType) {
     const badge = document.createElement("span");
     badge.className = "tool-badge";
     badge.textContent = item.subType;
-    who.append(badge, document.createTextNode(" "));
+    line.append(badge);
   }
-  who.append(item.title || "子 agent");
+  line.append(document.createTextNode(item.title || item.text || "子 agent"));
   if (item.status) {
     const st = document.createElement("span");
     st.className = `row-badge status-${item.status}`;
     st.textContent = item.status;
-    who.append(" ", st);
+    line.append(st);
   }
+  line.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    handlers.onToggle(item);
+  });
   const body = document.createElement("div");
   body.className = "body";
-  if (item.activity) {
+  const output = item.raw.trim();
+  if (output) {
+    const pre = document.createElement("pre");
+    pre.className = "subagent-output";
+    pre.textContent = output;
+    body.append(pre);
+  } else if (item.activity) {
     const act = document.createElement("div");
     act.className = "subagent-activity";
     act.textContent = item.activity;
     body.append(act);
-  } else if (item.text && item.text !== item.title) {
-    const p = document.createElement("div");
-    p.textContent = item.text;
-    body.append(p);
   }
-  el.append(who, body);
+  body.hidden = !item.open;
+  el.append(line, body);
 }
 
 function fillCompact(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {

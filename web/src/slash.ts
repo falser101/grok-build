@@ -164,7 +164,7 @@ const LOCAL_ACTIONS = new Set<string>([
 ]);
 
 /** Always-on S commands: send `/name` via session/prompt (pager does not consume these). */
-const SEND_ALWAYS = new Set(["compact", "flush", "dream", "memory", "loop"]);
+const SEND_ALWAYS = new Set(["compact", "flush", "dream", "memory", "remember", "loop"]);
 
 export const LATER_TOAST = "这一档不做";
 
@@ -267,6 +267,11 @@ export const LOCAL_SLASH: SlashCommand[] = [
   { name: "privacy", description: "编码数据与隐私", argumentHint: null },
   { name: "btw", description: "旁路提问", argumentHint: "question" },
   { name: "compact", description: "压缩上下文（发给 Agent）", argumentHint: "note" },
+  { name: "memory", description: "发给 Agent", argumentHint: null },
+  { name: "mem", description: "发给 Agent", argumentHint: null },
+  { name: "flush", description: "发给 Agent", argumentHint: null },
+  { name: "dream", description: "发给 Agent", argumentHint: null },
+  { name: "remember", description: "发给 Agent", argumentHint: null },
   { name: "hooks", description: "这一档不做", argumentHint: null },
   { name: "plugins", description: "这一档不做", argumentHint: null },
   { name: "marketplace", description: "这一档不做", argumentHint: null },

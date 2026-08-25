@@ -41,6 +41,8 @@ test("parseLocalSlash does not intercept S-send commands", () => {
   assert.equal(parseLocalSlash("/compact please"), null);
   assert.equal(parseLocalSlash("/flush"), null);
   assert.equal(parseLocalSlash("/dream"), null);
+  assert.equal(parseLocalSlash("/memory"), null);
+  assert.equal(parseLocalSlash("/remember"), null);
   assert.equal(parseLocalSlash("/user:foo"), null);
 });
 
@@ -171,6 +173,30 @@ test("wired help lists built-ins we ship, not an external site", () => {
   assert.match(help, new RegExp(HELP_FOOTER));
   assert.match(help, /不是外站/);
   assert.doesNotMatch(help, /gboom/);
+});
+
+test("slash menu lists memory commands as send-to-agent", () => {
+  for (const name of ["memory", "mem", "flush", "dream", "remember"]) {
+    const row = LOCAL_SLASH.find((c) => c.name === name);
+    assert.ok(row, name);
+    assert.equal(row?.description, "发给 Agent");
+    assert.equal(slashKind(name, "local"), "shell");
+    assert.equal(planSlash(`/${name}`).kind, "send");
+    assert.equal(parseLocalSlash(`/${name}`), null);
+  }
+  const merged = mergeSlashMenu(LOCAL_SLASH, [
+    { name: "implement", description: "from memory", argumentHint: null },
+  ]);
+  const memHits = merged.filter((c) => c.name === "memory" || c.name === "mem");
+  assert.equal(memHits.length, 2);
+  assert.ok(memHits.every((c) => c.kind === "shell"));
+  assert.equal(planSlash("/memory note").kind, "send");
+  assert.deepEqual(planSlash("/remember buy milk"), {
+    kind: "send",
+    name: "remember",
+    args: "buy milk",
+    text: "/remember buy milk",
+  });
 });
 
 test("skillUsedFromPrompt only matches colon skill send", () => {

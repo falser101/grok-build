@@ -135,6 +135,30 @@ test("slash query and fuzzy filter", () => {
   assert.equal(badged[0]?.kind, "skill");
 });
 
+test("memory slash hits itself before implement", () => {
+  const hits = filterSlashCommands(
+    [
+      { name: "implement", description: "from memory", argumentHint: null },
+      { name: "memory", description: "发给 Agent", argumentHint: null },
+      { name: "flush", description: "发给 Agent", argumentHint: null },
+      { name: "dream", description: "发给 Agent", argumentHint: null },
+      { name: "remember", description: "发给 Agent", argumentHint: null },
+    ],
+    "memory",
+  );
+  assert.equal(hits[0]?.name, "memory");
+  const mem = filterSlashCommands(
+    [
+      { name: "implement", description: "from memory", argumentHint: null },
+      { name: "memory", description: "发给 Agent", argumentHint: null },
+      { name: "mem", description: "发给 Agent", argumentHint: null },
+    ],
+    "mem",
+  );
+  assert.equal(mem[0]?.name, "mem");
+  assert.ok(mem.some((c) => c.name === "memory"));
+});
+
 test("queue drain and combine stop at slash", () => {
   assert.equal(shouldEnqueue(true, false), true);
   assert.equal(shouldEnqueue(true, true), false);

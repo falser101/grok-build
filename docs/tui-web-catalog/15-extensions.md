@@ -2,7 +2,7 @@
 
 | ID | 功能点 | TUI | Web 怎么做 | Web 已实现 |
 |---|---|---|---|---|
-| E-01 | MCP 列表 | `/mcps`；`x.ai/mcp/list` | 表：名、状态、工具数 | 否。**备注：扩展管理页 待讨论后再做。** |
+| E-01 | MCP 列表 | `/mcps`；`x.ai/mcp/list` | 表：名、状态、工具数 | 是：只读列表名、状态点、工具数。空则「还没有」。 |
 | E-02 | MCP 开关 | `toggle` / `toggle_tool` | 开关 | 否。**备注：扩展管理页 待讨论后再做。** |
 | E-03 | MCP upsert/delete | 配置增删 | 表单；stdio command 在本机执行 | 否。**备注：扩展管理页 待讨论后再做。** |
 | E-04 | MCP setup/auth | `auth_status` `auth_trigger` `setup` | OAuth 弹层 | 否。**备注：扩展管理页 待讨论后再做。** |
@@ -10,7 +10,7 @@
 | E-06 | MCP 资源读 | `read_resource` | 查看器 | 否。**备注：扩展管理页 待讨论后再做。** |
 | E-07 | SDK MCP 经 ACP | `x.ai/mcp/sdk_call` 反向；`_meta["x.ai/mcp/servers"]` | 本机 Web 通常不用（Agent 侧跑） | Agent 已有 |
 | E-08 | MCP call 正向 | `x.ai/mcp/call` | 调试用 | 否。**备注：扩展管理页 待讨论后再做。** |
-| E-09 | Skills 列表 | `/skills` tab | 列表 on/off、来源 local/user/plugin | 否。**备注：扩展管理页 待讨论后再做。** |
+| E-09 | Skills 列表 | `/skills` tab | 列表 on/off、来源 local/user/plugin | 是：只读名、来源、开/关文字。空则「还没有」。 |
 | E-10 | Skills 发现目录 | 用户/项目/plugin；watcher 热更 | 听 reload | 否。**备注：扩展管理页 待讨论后再做。** |
 | E-11 | Skills slash | /K- | 动态 | 是：availableCommands 动态 skills slash |
 | E-12 | Hooks 列表 | `/hooks`；`hooks-list` | 表 | 否。**备注：扩展管理页 待讨论后再做。** |

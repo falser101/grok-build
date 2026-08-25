@@ -9,7 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "drive": "node scripts/drive.mjs",
-    "test": "node --experimental-strip-types --test src/protocol.test.ts src/startup.test.ts src/session_ops.test.ts src/markdown.test.ts src/conversation.test.ts src/conversation_view.test.ts src/composer.test.ts src/slash.test.ts src/session_mode.test.ts src/palette.test.ts src/dashboard.test.ts src/highlight.test.ts src/theme.test.ts src/tool_blocks.test.ts src/blocking_cards.test.ts src/billing.test.ts",
+    "test": "node --experimental-strip-types --test src/protocol.test.ts src/startup.test.ts src/session_ops.test.ts src/markdown.test.ts src/conversation.test.ts src/conversation_view.test.ts src/composer.test.ts src/slash.test.ts src/session_mode.test.ts src/palette.test.ts src/dashboard.test.ts src/highlight.test.ts src/theme.test.ts src/tool_blocks.test.ts src/blocking_cards.test.ts src/billing.test.ts src/notify.test.ts",
     "test:e2e": "playwright test"
   },
   "devDependencies": {

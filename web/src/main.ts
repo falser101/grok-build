@@ -218,6 +218,11 @@ import {
   type DashSort,
   type RosterEntry,
 } from "./dashboard";
+import {
+  TURN_COMPLETE_TITLE,
+  shouldNotifyTurnComplete,
+  windowTitle,
+} from "./notify";
 /** Old Slice-0 default; treating it as unset so we don't pin the list to this repo. */
 const LEGACY_REPO_CWD = "/home/falser/Projects/grok-build";
 
@@ -649,6 +654,7 @@ function showSurface(
   markPhase(name);
   if (name === "session") uncoverChatIfOverlay();
   updateComposerDock();
+  syncWindowTitle();
 }
 
 function showSessionIndex() {
@@ -783,6 +789,24 @@ function endTurn(sid: string | null) {
   scheduleSidebarStatus(true);
 }
 
+async function requestThenNotify() {
+  if (typeof Notification === "undefined") return;
+  let permission = Notification.permission;
+  if (permission === "default") {
+    try {
+      permission = await Notification.requestPermission();
+    } catch {
+      return;
+    }
+  }
+  if (!shouldNotifyTurnComplete({ hidden: document.hidden, permission })) return;
+  try {
+    new Notification(TURN_COMPLETE_TITLE, { body: sessionLabel.textContent ?? "" });
+  } catch {
+    /* ignore */
+  }
+}
+
 function syncTurnFromRoster() {
   if (!sessionId) return;
   const row = dashRoster.find((r) => r.sessionId === sessionId);
@@ -851,7 +875,6 @@ function showDashboard() {
   renderDashboard();
   showSurface("dashboard");
   hint.textContent = `${DASH_PAGE_TITLE} · ${DASH_TITLE} · Ctrl+/ 搜索 · Enter 打开 · Esc 回列表`;
-  document.title = `${DASH_PAGE_TITLE} · Grok Web`;
   applyComposerGate();
   const next = hashForDashboard();
   if (location.hash !== next) {
@@ -1508,6 +1531,15 @@ function persistFields() {
   );
 }
 
+function syncWindowTitle() {
+  document.title = windowTitle({
+    surface: app.dataset.surface ?? "",
+    running: turnRunning,
+    sessionName: sessionLabel.textContent ?? "",
+    dashTitle: DASH_PAGE_TITLE,
+  });
+}
+
 function syncTurnButtons() {
   syncEscStopHint();
   btnStop.hidden = !turnRunning;
@@ -1517,6 +1549,7 @@ function syncTurnButtons() {
   btnSend.title = turnRunning ? "加入队列，当前回复结束后再发（Enter）" : "发送";
   syncComposerHint();
   syncLiveWait();
+  syncWindowTitle();
 }
 
 function syncComposerFilled() {
@@ -2084,6 +2117,7 @@ function handleAgentEvent(method: string, params: Json) {
     if (effect.type === "prompt-complete") {
       endTurn(eventSid || sessionId);
       if (!timeline.replayActive) {
+        void requestThenNotify();
         setState("live", "已连接");
         hint.textContent = composerPrefs.enterSends
           ? "Enter 发送 · Shift+Enter 换行"
@@ -2320,6 +2354,7 @@ function applyTitleNotification(
     titlePinned = true;
     if (title && sessionId) {
       sessionLabel.textContent = title;
+      syncWindowTitle();
       const row = recentSessions.find((s) => s.sessionId === sessionId);
       if (row) row.summary = title;
       renderSessionList();
@@ -2332,6 +2367,7 @@ function applyTitleNotification(
   }
   if (!titlePinned && title && sessionId) {
     sessionLabel.textContent = title;
+    syncWindowTitle();
     const row = recentSessions.find((s) => s.sessionId === sessionId);
     if (row) row.summary = title;
     renderSessionList();
@@ -2886,6 +2922,7 @@ function setSession(id: string) {
   const row = recentSessions.find((s) => s.sessionId === id);
   const summary = row?.summary.trim();
   sessionLabel.textContent = summary && summary !== id ? summary : id;
+  syncWindowTitle();
   setState("live", "已连接");
   hint.textContent = hintForFocus("composer", composerPrefs.enterSends);
   applyComposerGate();
@@ -3577,6 +3614,7 @@ function clearSessionView() {
   sessionId = null;
   lastEventId = null;
   sessionLabel.textContent = "无 session";
+  syncWindowTitle();
   showEmpty();
 }
 

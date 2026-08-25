@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   ConversationTimeline,
+  noteUnimplementedUpdate,
   formatCompactElapsed,
   formatCompactTokens,
   isReplayMeta,
@@ -913,4 +914,26 @@ test("replyFeedbackParams sends snake+camel and reply ids, never a fake request_
   assert.equal(solicited.requestId, "fb-req-1");
   assert.equal(solicited.request_id, "fb-req-1");
   assert.equal(solicited.event_id, "evt-card");
+});
+
+test("unknown sessionUpdate logs 未实现更新 and stays off the timeline", () => {
+  const lines: string[] = [];
+  noteUnimplementedUpdate("goal_updated", (msg) => lines.push(msg));
+  assert.equal(lines[0], "未实现更新 goal_updated");
+  const t = new ConversationTimeline();
+  const logged: string[] = [];
+  const orig = console.debug;
+  console.debug = (msg?: unknown) => {
+    if (typeof msg === "string") logged.push(msg);
+  };
+  try {
+    const effects = t.apply("session/update", {
+      update: { sessionUpdate: "goal_updated" },
+    });
+    assert.equal(t.items.length, 0);
+    assert.equal(effects.some((e) => e.type === "banner" || e.type === "redraw"), false);
+    assert.ok(logged.some((line) => line === "未实现更新 goal_updated"));
+  } finally {
+    console.debug = orig;
+  }
 });

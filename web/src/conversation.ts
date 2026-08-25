@@ -105,6 +105,17 @@ export function isTurnTerminalKind(kind: string): boolean {
   return k === "turn_completed";
 }
 
+export function noteUnimplementedUpdate(
+  kind: string,
+  log: (msg: string) => void = (msg) => {
+    console.debug(msg);
+  },
+): void {
+  if (!kind) return;
+  log(`未实现更新 ${kind}`);
+}
+
+
 let seq = 1;
 function nid(prefix: string): string {
   seq += 1;
@@ -471,8 +482,10 @@ export class ConversationTimeline {
     if (kind === "follow_up" || kind === "submit_follow_up") {
       const texts = parseFollowUps(update);
       if (texts.length) return [{ type: "follow-ups", texts }];
+      return [];
     }
     if (kind) {
+      noteUnimplementedUpdate(kind);
       return [];
     }
     return [];

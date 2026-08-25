@@ -4,7 +4,7 @@
 
 | ID | 功能点 | TUI | Web 怎么做 | Web 已实现 |
 |---|---|---|---|---|
-| R-01 | `/doctor` | 终端/tmux/颜色/键盘/剪贴板/通知焦点/sandbox/麦克风 | 页面：serve 是否可达、WS 鉴权、session 是否 initialize。不要查 tmux | 是：连不上 serve 的 doctor 页（进程未起 / secret / 401） |
+| R-01 | `/doctor` | 终端/tmux/颜色/键盘/剪贴板/通知焦点/sandbox/麦克风 | 页面：serve 是否可达、WS 鉴权、session 是否 initialize。不要查 tmux | 是：/doctor /terminal-setup /命令面板开「连接诊断」。连上叠在会话，三项过+关闭。serve 没起独立表面，不过/进程未起，后两行未查+重试。401/secret 同一结构换原因（secret 不对）；本轮测试未复现 401，未测。 |
 | R-02 | `grok doctor --json` | 管道 | 可选调试 | 否（N/A） |
 | R-03 | `/doctor fix` | tmux-clipboard、dcs-passthrough、extended-keys、truecolor；改 conf 不 source | **不做** | 否（不做） |
 | R-04 | 终端品牌探测 | Apple/Ghostty/iTerm/Warp/Wez/Kitty/Alacritty/Rio/foot/VSCode 家族/JetBrains/Grok Desktop/VTE/Windows Terminal | `navigator.userAgent` 仅调试 | 否（N/A） |

@@ -20,6 +20,10 @@ import {
   pasteTooLarge,
   atQuery,
   applyAtAccept,
+  fileRefPath,
+  normalizeLineRange,
+  parseReadFileContent,
+  previewFileLines,
   looksLikePlan,
   parseModelState,
   permissionChipLabel,
@@ -232,6 +236,14 @@ test("local slash at-query plan nudge and suggest parsers", () => {
   assert.equal(parseLocalSlash("/not-a-local"), null);
   assert.equal(atQuery("see @src/ma", 12), "src/ma");
   assert.equal(applyAtAccept("see @src/ma", 12, "src/main.ts"), "see @src/main.ts ");
+  assert.equal(
+    applyAtAccept("see @src/ma", 12, "src/main.ts", { start: 10, end: 10 }),
+    "see @src/main.ts:10 ",
+  );
+  assert.equal(
+    applyAtAccept("see @src/ma", 12, "src/main.ts", { start: 12, end: 10 }),
+    "see @src/main.ts:10-12 ",
+  );
   assert.equal(looksLikePlan("1. one\n2. two"), true);
   assert.equal(looksLikePlan("hi"), false);
   const sug = parseSuggest({
@@ -242,6 +254,11 @@ test("local slash at-query plan nudge and suggest parsers", () => {
   assert.equal(sug.completions[0]?.insertText, "src/main.ts");
   assert.equal(parseFuzzyOpen({ searchId: "abc" }), "abc");
   assert.equal(parseFuzzyStatus({ matches: [{ path: "a.ts", score: 9 }] })[0]?.path, "a.ts");
+  assert.equal(parseFuzzyStatus({ matches: [{ path: "a.ts", score: 9 }] })[0]?.kind, "file");
+  assert.equal(
+    parseFuzzyStatus({ matches: [{ path: "src", type: "directory", score: 1 }] })[0]?.kind,
+    "directory",
+  );
   const open = buildFuzzyOpenParams({
     sessionId: "s1",
     cwd: "/home/falser/Projects/grok-build",
@@ -257,12 +274,32 @@ test("local slash at-query plan nudge and suggest parsers", () => {
   assert.equal(relativizeFuzzyPath("/etc/passwd", "/home/falser/Projects/grok-build"), null);
   const scoped = scopeFuzzyMatches(
     [
-      { path: "/home/falser/Projects/grok-build/README.md", score: 1 },
-      { path: "/home/falser/.bashrc", score: 2 },
+      { path: "/home/falser/Projects/grok-build/README.md", score: 1, kind: "file" },
+      { path: "/home/falser/.bashrc", score: 2, kind: "file" },
     ],
     "/home/falser/Projects/grok-build",
   );
   assert.deepEqual(scoped.map((r) => r.path), ["README.md"]);
+  assert.equal(scoped[0]?.kind, "file");
+});
+
+test("@ file ref range and read_file preview helpers", () => {
+  assert.deepEqual(normalizeLineRange(12, 4), { start: 4, end: 12 });
+  assert.equal(fileRefPath("web/src/main.ts"), "web/src/main.ts");
+  assert.equal(fileRefPath("web/src/main.ts", { start: 8, end: 8 }), "web/src/main.ts:8");
+  assert.equal(fileRefPath("web/src/main.ts", { start: 8, end: 12 }), "web/src/main.ts:8-12");
+  const text = parseReadFileContent({ content: "a\nb\n", type: "text/plain" });
+  assert.equal(text.binary, false);
+  assert.deepEqual(previewFileLines("one\ntwo\nthree", 2, 10), ["one", "two"]);
+  assert.equal(previewFileLines("x".repeat(12), 1, 4)[0], "xxxx…");
+  const bin = parseReadFileContent({
+    content: "",
+    content_base64: "AAAA",
+    type: "application/octet-stream",
+  });
+  assert.equal(bin.binary, true);
+  const nested = parseReadFileContent({ result: { content: "hi", type: "text/plain" } });
+  assert.equal(nested.content, "hi");
 });
 
 test("prompt history and queue/changed parsers", () => {

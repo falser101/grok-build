@@ -196,6 +196,24 @@ test("header does not show model chip or session tools", async ({ page }) => {
   await expect(page.locator("#composer #btn-model-chip")).toBeVisible();
 });
 
+test("running task sits in the header and opens log detail", async ({ page }) => {
+  await page.goto("/?noconnect=1");
+  await expect(page.locator("#header-task")).toBeHidden();
+  await page.evaluate(() => {
+    window.__grokWebTest?.seedTask({
+      label: "npm run dev",
+      output: "VITE ready in 84 ms\nLocal: http://127.0.0.1:5173/\n",
+    });
+  });
+  await expect(page.locator("#header-task")).toBeVisible();
+  await expect(page.locator("#header-task")).toContainText("npm run dev");
+  await expect(page.locator(".header-right")).toBeHidden();
+  await expect(page.locator("#header-context")).toBeHidden();
+  await page.locator("#header-task").click();
+  await expect(page.locator("#app-dialog")).toBeVisible();
+  await expect(page.locator(".task-log")).toContainText("VITE ready");
+});
+
 test("Ctrl+; pins the queue pane", async ({ page }) => {
   await page.goto("/?noconnect=1");
   await expect(page.locator("#queue-strip")).toBeHidden();
@@ -648,6 +666,22 @@ test("slash menu lists initialize availableCommands", async ({ page }) => {
   await page.locator("#prompt").press("Tab");
   await expect(page.locator("#slash-menu")).toBeHidden();
   await expect(page.locator("#prompt")).toHaveValue(/^\//);
+});
+
+test("@ picker previews file lines before insert", async ({ page }) => {
+  await waitAuthed(page);
+  await page.locator("#btn-new").click();
+  await expect(page.locator("#session-label")).not.toHaveText("无 session", {
+    timeout: 30_000,
+  });
+  await page.locator("#prompt").fill("@Cargo.toml");
+  await expect(page.locator("#at-menu")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("#at-menu .slash-row").first()).toBeVisible();
+  await expect(page.locator(".at-preview-body .at-line").first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".at-line-text").first()).not.toHaveText("");
+  await page.locator(".at-preview-body .at-line").first().click();
+  await expect(page.locator("#at-menu")).toBeHidden();
+  await expect(page.locator("#prompt")).toHaveValue(/@Cargo[^ ]*:\d+ /);
 });
 
 test("queue captures a follow-up while a turn is marked running", async ({ page }) => {

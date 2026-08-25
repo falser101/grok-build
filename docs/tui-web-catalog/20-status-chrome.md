@@ -9,7 +9,7 @@
 | H-03 | Context bar | 占用 % | 顶栏；amber 在 compact 阈值或 80% | 是：用量弹层；顶栏不画 |
 | H-04 | Credit bar | 额度 | 同 | 是：不在顶栏（输入框已有模型）；侧栏账户区「还剩 N%」，点开看本周/本月额度 |
 | H-05 | Turn status | 与 prompt 间距 | 「正在跑」 | 是：正在想 / 跑工具 / Stop |
-| H-06 | Watching 行 | 后台仍活 | 「1 monitor · 2 loops」 | 否。**备注：watching 行 待讨论后再做。** |
+| H-06 | Watching 行 | 后台仍活 | 「1 monitor · 2 loops」 | 是：不画 TUI 底栏 watching；顶栏右上角运行中任务芯片，点击看日志 |
 | H-07 | Status line 关 | `[ui.status_line] type=disabled` 默认 | 默认不画 | 是：默认不画 TUI status line |
 | H-08 | Status line builtin | items: cwd, model, context, cost, turn-timer, session-name | 底栏拼段；cost&lt;$0.005 藏 | 否（不做）：不拼 TUI 底栏 |
 | H-09 | Status line command | 脚本 stdin JSON，stdout ANSI/OSC8，最多 5 行，10s 超时，64KiB | **Web 跑用户脚本有 XSS 风险**。P3 才做；做则 iframe sandbox 或只 builtin | 否（不做）：不跑用户 status 脚本（XSS） |

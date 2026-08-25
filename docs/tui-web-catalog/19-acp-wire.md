@@ -56,7 +56,7 @@ Web 客户端按方法接。TUI 已全部使用或可使用。标准方法见 [A
 | Q-45 | `x.ai/marketplace/list` `action` | E-26 | | 否。**备注：见 15。** |
 | Q-46 | `x.ai/plugins/notify-updates` | | | 否。**备注：见 15。** |
 | Q-47 | `x.ai/subagent/cancel` | X-05 | | 否。**备注：见 16。** |
-| Q-48 | `x.ai/task/kill` | X-13 | | 否。**备注：见 16。** |
+| Q-48 | `x.ai/task/kill` | X-13 | | 是 |
 | Q-49 | `x.ai/workflows/list` | X-31 | | 否。**备注：见 16。** |
 | Q-50 | `x.ai/code/status` | 代码状态 | 可选 | 否。**备注：code/status 待讨论后再做。** |
 | Q-51 | `x.ai/debug/agent` | 内部 | 不要对用户暴露 | 否（不做） |
@@ -79,8 +79,8 @@ Web 客户端按方法接。TUI 已全部使用或可使用。标准方法见 [A
 | Q-67 | `x.ai/git/worktree/status` | 进度 | | 否。**备注：worktree 进度 待讨论后再做。** |
 | Q-68 | `x.ai/fs_notify` `fs/index` `fs/index/delta` | 文件树 | @ 缓存 | 否。**备注：fs 索引 待讨论后再做。** |
 | Q-69 | `x.ai/mcp/server_status` 等 | E- | | 否。**备注：见 15。** |
-| Q-70 | `x.ai/task_backgrounded` | X-11 | | 否。**备注：见 16。** |
-| Q-71 | `x.ai/task_completed` | X-12 | | 否。**备注：见 16。** |
+| Q-70 | `x.ai/task_backgrounded` | X-11 | | 是 |
+| Q-71 | `x.ai/task_completed` | X-12 | | 是 |
 | Q-72 | `x.ai/monitor_event` | X-16 | | 否。**备注：见 16。** |
 | Q-73 | `x.ai/leader/version_mismatch` | 横幅 | toast 升级本机 grok | 否。**备注：版本不匹配横幅 待讨论后再做。** |
 | Q-74 | `x.ai/leader_reconnected` | 重连 | W-05 | 是：重连 load（W-05） |

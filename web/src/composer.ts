@@ -273,10 +273,38 @@ export function atQuery(text: string, caret: number): string | null {
   return m ? m[1]! : null;
 }
 
-export function applyAtAccept(text: string, caret: number, path: string): string {
+/** 1-based inclusive line range for `@path:N` / `@path:N-M`. */
+export type LineRange = { start: number; end: number };
+
+export type FuzzyMatchItem = {
+  path: string;
+  score: number;
+  kind: "file" | "directory";
+};
+
+export function normalizeLineRange(a: number, b: number): LineRange {
+  const start = Math.max(1, Math.min(a, b));
+  const end = Math.max(1, Math.max(a, b));
+  return { start, end };
+}
+
+/** Path token without the leading `@`. */
+export function fileRefPath(path: string, range?: LineRange | null): string {
+  if (!range) return path;
+  const n = normalizeLineRange(range.start, range.end);
+  if (n.start === n.end) return `${path}:${n.start}`;
+  return `${path}:${n.start}-${n.end}`;
+}
+
+export function applyAtAccept(
+  text: string,
+  caret: number,
+  path: string,
+  range?: LineRange | null,
+): string {
   const before = text.slice(0, caret);
   const after = text.slice(caret);
-  const replaced = before.replace(/@([^\s]*)$/, `@${path} `);
+  const replaced = before.replace(/@([^\s]*)$/, `@${fileRefPath(path, range)} `);
   return replaced + after;
 }
 
@@ -337,19 +365,28 @@ export function parseFuzzyOpen(payload: Json): string | null {
   return id;
 }
 
-export function parseFuzzyStatus(params: Json): { path: string; score: number }[] {
+function fuzzyMatchKind(row: { [k: string]: Json }): "file" | "directory" {
+  if (row.type === "directory" || row.is_dir === true || row.isDir === true) return "directory";
+  return "file";
+}
+
+export function parseFuzzyStatus(params: Json): FuzzyMatchItem[] {
   const rec =
     params && typeof params === "object" && !Array.isArray(params)
       ? (params as { [k: string]: Json })
       : null;
   const matches = rec?.matches;
   if (!Array.isArray(matches)) return [];
-  const out: { path: string; score: number }[] = [];
+  const out: FuzzyMatchItem[] = [];
   for (const row of matches) {
     if (!row || typeof row !== "object" || Array.isArray(row)) continue;
     const r = row as { [k: string]: Json };
     if (typeof r.path === "string") {
-      out.push({ path: r.path, score: typeof r.score === "number" ? r.score : 0 });
+      out.push({
+        path: r.path,
+        score: typeof r.score === "number" ? r.score : 0,
+        kind: fuzzyMatchKind(r),
+      });
     }
   }
   return out;
@@ -381,17 +418,59 @@ export function relativizeFuzzyPath(path: string, root: string): string | null {
   return null;
 }
 
-export function scopeFuzzyMatches(
-  matches: { path: string; score: number }[],
-  root: string,
-): { path: string; score: number }[] {
-  const out: { path: string; score: number }[] = [];
+export function scopeFuzzyMatches(matches: FuzzyMatchItem[], root: string): FuzzyMatchItem[] {
+  const out: FuzzyMatchItem[] = [];
   for (const row of matches) {
     const rel = relativizeFuzzyPath(row.path, root);
     if (rel == null || rel === "") continue;
-    out.push({ path: rel, score: row.score });
+    out.push({ path: rel, score: row.score, kind: row.kind });
   }
   return out;
+}
+
+export const AT_PREVIEW_MAX_LINES = 200;
+export const AT_PREVIEW_MAX_CHARS = 240;
+
+export type ReadFilePreview = {
+  content: string;
+  binary: boolean;
+  type: string;
+};
+
+function jsonRecord(value: Json): { [k: string]: Json } | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as { [k: string]: Json })
+    : null;
+}
+
+export function parseReadFileContent(payload: Json): ReadFilePreview {
+  const rec = jsonRecord(payload);
+  const inner = rec?.result !== undefined ? jsonRecord(rec.result) ?? rec : rec;
+  const type = inner && typeof inner.type === "string" ? inner.type : "";
+  const b64 =
+    (inner && typeof inner.content_base64 === "string" && inner.content_base64) ||
+    (inner && typeof inner.contentBase64 === "string" && inner.contentBase64) ||
+    "";
+  const content = inner && typeof inner.content === "string" ? inner.content : "";
+  const binary =
+    Boolean(b64) ||
+    type === "application/octet-stream" ||
+    type.startsWith("image/") ||
+    type.startsWith("audio/") ||
+    type.startsWith("video/") ||
+    content.includes("\0");
+  return { content, binary, type };
+}
+
+export function previewFileLines(
+  content: string,
+  maxLines = AT_PREVIEW_MAX_LINES,
+  maxChars = AT_PREVIEW_MAX_CHARS,
+): string[] {
+  const raw = content.split(/\r\n|\n|\r/);
+  return raw.slice(0, maxLines).map((line) =>
+    line.length > maxChars ? `${line.slice(0, maxChars)}…` : line,
+  );
 }
 
 export function isQueuedSlash(text: string): boolean {

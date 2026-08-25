@@ -62,6 +62,10 @@ import {
   applyAtAccept,
   applySlashAccept,
   atQuery,
+  parseReadFileContent,
+  previewFileLines,
+  type FuzzyMatchItem,
+  type LineRange,
   buildPromptHistoryParams,
   composerIsFilled,
   nextComposerTextareaHeight,
@@ -94,6 +98,21 @@ import {
   type SlashCommand,
 } from "./composer";
 import { applyTheme, loadThemePref, persistThemePref } from "./theme";
+import {
+  applyTaskNotice,
+  buildTaskKillParams,
+  buildTaskListParams,
+  formatTaskDuration,
+  parseTaskListResult,
+  parseTaskNotification,
+  upsertListedTasks,
+  headerTaskChipText,
+  runningTasks,
+  sessionHasRunningTasks,
+  tailTaskLog,
+  tasksForSession,
+  type LiveTask,
+} from "./tasks";
 import {
   buildSetModeParams,
   cycleSessionMode,
@@ -364,6 +383,7 @@ const welcomeVersion = $("welcome-version");
 const versionBadge = $("version-badge");
 const planBadge = $("plan-badge");
 const billingChip = $<HTMLButtonElement>("billing-chip");
+const taskChip = $<HTMLButtonElement>("header-task");
 const consentBanner = $("consent-banner");
 const paywallEl = $("paywall");
 const paywallCopy = $("paywall-copy");
@@ -468,6 +488,9 @@ let dashPins = loadIdSet(localStorage, DASH_PIN_KEY);
 let dashCollapsed = loadIdSet(localStorage, DASH_COLLAPSE_KEY);
 if (!localStorage.getItem(DASH_COLLAPSE_KEY)) dashCollapsed.add("inactive");
 const backgroundIds = new Set<string>();
+const liveTasks = new Map<string, LiveTask>();
+let taskTick = 0;
+let viewingTaskId: string | null = null;
 const needsInputIds = new Set<string>();
 const loadedIds = new Set<string>();
 type ParkedBlock = {
@@ -481,7 +504,7 @@ let dashDeleteArmed: { id: string; at: number } | null = null;
 let paletteItems: PaletteItem[] = [];
 let paletteIndex = 0;
 let paletteQuery = "";
-type AppDialogKind = "palette" | "shortcuts" | "args" | "later" | "block" | "sheet" | "extensions" | "tasks" | null;
+type AppDialogKind = "palette" | "shortcuts" | "args" | "later" | "block" | "sheet" | "extensions" | "tasks" | "task-detail" | null;
 let appDialogKind: AppDialogKind = null;
 timeline.opts.showThinking = composerPrefs.showThinking;
 timeline.opts.groupTools = composerPrefs.groupTools;
@@ -504,8 +527,14 @@ let lastEmptyEnterAt = 0;
 let queueIdSeq = 1;
 let composerMode: "" | "shell" | "remember" = "";
 let ghostText = "";
-let atItems: { path: string; score: number }[] = [];
+let atItems: FuzzyMatchItem[] = [];
 let atIndex = 0;
+let atListKey = "";
+let atPreviewPath: string | null = null;
+let atPreviewSeq = 0;
+let atPreviewTimer = 0;
+let atLineAnchor: number | null = null;
+const atPreviewCache = new Map<string, { lines: string[] | null; note: string }>();
 let fuzzySearchId: string | null = null;
 let fuzzySearchKey = "";
 let findHits: { id: string; index: number }[] = [];
@@ -778,7 +807,7 @@ function noteBackgroundWork(method: string, params: unknown) {
 
 function endTurn(sid: string | null) {
   if (sid) {
-    backgroundIds.delete(sid);
+    if (!sessionHasRunningTasks(liveTasks, sid)) backgroundIds.delete(sid);
     needsInputIds.delete(sid);
   }
   if (!sid || sid === sessionId) {
@@ -2019,8 +2048,32 @@ function recordBackgroundStream(method: string, params: Json, eventSid: string) 
   scheduleSidebarStatus();
 }
 
+function ingestLiveTask(method: string, params: Json) {
+  const notice = parseTaskNotification(method, params, sessionId ?? "");
+  if (!notice) return false;
+  applyTaskNotice(liveTasks, notice);
+  if (notice.task.sessionId) {
+    if (notice.task.running) backgroundIds.add(notice.task.sessionId);
+    else if (
+      !sessionHasRunningTasks(liveTasks, notice.task.sessionId) &&
+      (notice.task.sessionId !== sessionId || !turnRunning)
+    ) {
+      backgroundIds.delete(notice.task.sessionId);
+    }
+  }
+  syncTaskChip();
+  if (appDialogKind === "tasks") paintTasks();
+  if (appDialogKind === "task-detail" && viewingTaskId === notice.task.id) {
+    const row = tasksForSession(liveTasks, sessionId).find((item) => item.id === viewingTaskId);
+    if (row) void refreshTaskDetail(row, false);
+  }
+  scheduleSidebarStatus();
+  return true;
+}
+
 function handleAgentEvent(method: string, params: Json) {
   noteBackgroundWork(method, params);
+  ingestLiveTask(method, params);
   const eventSid = notificationSessionId(params);
   if (
     !isFrontSessionStream({
@@ -2849,6 +2902,7 @@ async function loadSession(
   }
   flushParkedBlocks(id);
   renderSessionList();
+  void refreshTasks(id);
 }
 
 async function newSession(): Promise<void> {
@@ -3456,7 +3510,7 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
     return true;
   }
   if (name === "tasks") {
-    openTasks();
+    void openTasks();
     return true;
   }
   if (name === "usage") {
@@ -3650,7 +3704,10 @@ function clearSessionView() {
   sessionId = null;
   lastEventId = null;
   sessionLabel.textContent = "无 session";
+  syncTaskChip();
   syncWindowTitle();
+  atPreviewCache.clear();
+  atPreviewPath = null;
   showEmpty();
 }
 
@@ -4535,43 +4592,281 @@ async function openExtensions(tab: "skills" | "mcps") {
   paintExtensions(tab, skills, mcps);
 }
 
-function openTasks() {
+function syncTaskChip() {
+  const running = runningTasks(liveTasks, sessionId);
+  const n = running.length;
+  taskChip.hidden = n === 0;
+  taskChip.textContent = headerTaskChipText(running, Date.now());
+  const first = running[0];
+  taskChip.title = first
+    ? `${first.label} · ${formatTaskDuration(first.startedAt, Date.now())}`
+    : "后台任务";
+  if (n > 0 && !taskTick) {
+    taskTick = window.setInterval(() => {
+      if (!runningTasks(liveTasks, sessionId).length) {
+        window.clearInterval(taskTick);
+        taskTick = 0;
+        syncTaskChip();
+        return;
+      }
+      syncTaskChip();
+      if (appDialogKind === "task-detail" && viewingTaskId) {
+        const row = tasksForSession(liveTasks, sessionId).find((item) => item.id === viewingTaskId);
+        if (row) void refreshTaskDetail(row, false);
+      }
+    }, 1000);
+  }
+  if (n === 0 && taskTick) {
+    window.clearInterval(taskTick);
+    taskTick = 0;
+  }
+}
+
+async function refreshTasks(id: string | null = sessionId, attempt = 0) {
+  if (!id || !acp.connected) {
+    syncTaskChip();
+    return;
+  }
+  try {
+    const parsed = parseTaskListResult(
+      extResultPayload(await acp.request("x.ai/task/list", buildTaskListParams(id))),
+      id,
+    );
+    if (!parsed.ok) {
+      if (attempt < 2) window.setTimeout(() => void refreshTasks(id, attempt + 1), attempt === 0 ? 400 : 1600);
+    } else {
+      upsertListedTasks(liveTasks, id, parsed.tasks);
+      if (sessionHasRunningTasks(liveTasks, id)) backgroundIds.add(id);
+      if (parsed.tasks.length === 0 && sessionHasRunningTasks(liveTasks, id) && attempt < 2) {
+        window.setTimeout(() => void refreshTasks(id, attempt + 1), 400);
+      }
+    }
+  } catch {
+    if (attempt < 2) window.setTimeout(() => void refreshTasks(id, attempt + 1), attempt === 0 ? 400 : 1600);
+  }
+  syncTaskChip();
+  if (appDialogKind === "tasks") paintTasks();
+  if (appDialogKind === "task-detail" && viewingTaskId) {
+    const row = tasksForSession(liveTasks, sessionId).find((item) => item.id === viewingTaskId);
+    if (row) void refreshTaskDetail(row, false);
+  }
+}
+
+function paintTasks() {
   appDialogBody.replaceChildren();
-  const rows = listSubagentTasks(timeline.items);
+  const now = Date.now();
+  const bg = tasksForSession(liveTasks, sessionId);
+  const running = bg.filter((row) => row.running);
+  const done = bg.filter((row) => !row.running).slice(0, 8);
+  const agents = listSubagentTasks(timeline.items);
   const table = document.createElement("div");
   table.className = "task-list";
-  if (!rows.length) {
+  if (!running.length && !agents.length && !done.length) {
     const empty = document.createElement("p");
     empty.className = "ext-empty";
-    empty.textContent = "还没有";
+    empty.textContent = "没有正在运行的任务";
     table.append(empty);
   } else {
-    const head = document.createElement("div");
-    head.className = "task-row task-head";
-    for (const label of ["类型", "状态", "描述"]) {
+    const appendHead = (title: string) => {
+      const head = document.createElement("div");
+      head.className = "task-row task-head";
       const cell = document.createElement("span");
-      cell.textContent = label;
+      cell.textContent = title;
+      cell.style.gridColumn = "1 / -1";
       head.append(cell);
-    }
-    table.append(head);
-    for (const row of rows) {
+      table.append(head);
+    };
+    const appendBg = (row: LiveTask) => {
       const line = document.createElement("div");
-      line.className = "task-row";
-      const type = document.createElement("span");
-      type.textContent = row.type;
+      line.className = "task-row task-live";
+      const kind = document.createElement("span");
+      kind.textContent = row.kind === "monitor" ? "监视" : "命令";
       const status = document.createElement("span");
-      status.textContent = row.status;
+      status.textContent = row.running
+        ? formatTaskDuration(row.startedAt, now)
+        : row.signal
+          ? `信号 ${row.signal}`
+          : row.exitCode == null
+            ? "已结束"
+            : `退出 ${row.exitCode}`;
       const desc = document.createElement("span");
-      desc.textContent = row.description;
-      line.append(type, status, desc);
+      desc.textContent = row.label;
+      desc.title = row.command || row.label;
+      line.append(kind, status, desc);
+      if (row.running && sessionId) {
+        const stop = document.createElement("button");
+        stop.type = "button";
+        stop.className = "task-stop";
+        stop.textContent = "停止";
+        stop.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          void killLiveTask(row);
+        });
+        line.append(stop);
+      }
+      line.addEventListener("click", () => {
+        void openTaskDetail(row);
+      });
       table.append(line);
+    };
+    if (running.length) {
+      appendHead("运行中");
+      running.forEach(appendBg);
+    }
+    if (agents.length) {
+      appendHead("子代理");
+      for (const row of agents) {
+        const line = document.createElement("div");
+        line.className = "task-row";
+        const type = document.createElement("span");
+        type.textContent = row.type || "子代理";
+        const status = document.createElement("span");
+        status.textContent = row.status || "";
+        const desc = document.createElement("span");
+        desc.textContent = row.description;
+        line.append(type, status, desc);
+        table.append(line);
+      }
+    }
+    if (done.length) {
+      appendHead("最近结束");
+      done.forEach(appendBg);
     }
   }
   const foot = document.createElement("p");
   foot.className = "shortcut-foot";
-  foot.textContent = "Esc 关闭";
+  foot.textContent = "Esc 关闭 · Ctrl+G 打开";
   appDialogBody.append(table, foot);
+}
+
+async function killLiveTask(row: LiveTask) {
+  if (!sessionId) return;
+  try {
+    await acp.request("x.ai/task/kill", buildTaskKillParams(sessionId, row.id));
+  } catch (err) {
+    showBanner(err instanceof Error ? err.message : String(err), "task-kill");
+  }
+  void refreshTasks(sessionId);
+}
+
+async function openTasks() {
+  viewingTaskId = null;
+  await refreshTasks(sessionId);
+  paintTasks();
   showAppDialog("任务", "tasks");
+}
+
+async function openHeaderTask() {
+  await refreshTasks(sessionId);
+  const running = runningTasks(liveTasks, sessionId);
+  if (running.length === 1) {
+    await openTaskDetail(running[0]!);
+    return;
+  }
+  await openTasks();
+}
+
+function taskLogPinned(pre: HTMLElement): boolean {
+  return pre.scrollHeight - pre.scrollTop - pre.clientHeight < 48;
+}
+
+function taskDetailStatus(row: LiveTask): string {
+  return row.running
+    ? `运行中 · ${formatTaskDuration(row.startedAt, Date.now())}`
+    : row.signal
+      ? `已结束 · ${row.signal}`
+      : `已结束${row.exitCode == null ? "" : ` · 退出 ${row.exitCode}`}`;
+}
+
+function paintTaskDetail(row: LiveTask, log: string, follow = true) {
+  const text = tailTaskLog(log) || "还没有输出";
+  const existing = appDialogBody.querySelector(".task-log");
+  if (
+    existing instanceof HTMLElement &&
+    appDialogKind === "task-detail" &&
+    viewingTaskId === row.id
+  ) {
+    const dur = appDialogBody.querySelector(".task-detail-status");
+    if (dur) dur.textContent = taskDetailStatus(row);
+    if (existing.textContent === text) return;
+    const pinned = taskLogPinned(existing);
+    const top = existing.scrollTop;
+    existing.textContent = text;
+    existing.scrollTop = follow || pinned ? existing.scrollHeight : top;
+    return;
+  }
+  appDialogBody.replaceChildren();
+  const meta = document.createElement("div");
+  meta.className = "task-detail-meta";
+  const dur = document.createElement("span");
+  dur.className = "task-detail-status";
+  dur.textContent = taskDetailStatus(row);
+  meta.append(dur);
+  if (row.cwd) {
+    const cwd = document.createElement("span");
+    cwd.textContent = row.cwd;
+    meta.append(cwd);
+  }
+  const actions = document.createElement("div");
+  actions.className = "task-detail-actions";
+  const back = document.createElement("button");
+  back.type = "button";
+  back.textContent = "全部任务";
+  back.addEventListener("click", () => {
+    void openTasks();
+  });
+  actions.append(back);
+  if (row.running && sessionId) {
+    const stop = document.createElement("button");
+    stop.type = "button";
+    stop.className = "task-stop";
+    stop.textContent = "停止";
+    stop.addEventListener("click", () => {
+      void killLiveTask(row);
+    });
+    actions.append(stop);
+  }
+  const pre = document.createElement("pre");
+  pre.className = "task-log";
+  pre.textContent = text;
+  appDialogBody.append(meta, actions, pre);
+  if (follow) pre.scrollTop = pre.scrollHeight;
+}
+
+async function readTaskLog(row: LiveTask): Promise<string> {
+  if (row.outputFile && acp.connected) {
+    try {
+      const raw = extResultPayload(
+        await acp.request("x.ai/fs/read_file", {
+          path: row.outputFile,
+          sessionId,
+          cwd: row.cwd || atSearchRoot(),
+        }),
+      );
+      const parsed = parseReadFileContent(raw);
+      if (!parsed.binary && parsed.content) return parsed.content;
+    } catch {
+      /* fall through to snapshot output */
+    }
+  }
+  return row.output;
+}
+
+async function refreshTaskDetail(row: LiveTask, follow: boolean) {
+  if (viewingTaskId !== row.id) return;
+  const latest = tasksForSession(liveTasks, sessionId).find((item) => item.id === row.id) ?? row;
+  const log = await readTaskLog(latest);
+  if (viewingTaskId !== row.id || appDialogKind !== "task-detail") return;
+  paintTaskDetail(latest, log, follow);
+}
+
+async function openTaskDetail(row: LiveTask) {
+  viewingTaskId = row.id;
+  await refreshTasks(sessionId);
+  const latest = tasksForSession(liveTasks, sessionId).find((item) => item.id === row.id) ?? row;
+  const log = await readTaskLog(latest);
+  paintTaskDetail(latest, log, true);
+  showAppDialog(latest.label, "task-detail");
 }
 
 function closeSettings() {
@@ -4580,6 +4875,7 @@ function closeSettings() {
 
 function closeAppDialog() {
   appDialogKind = null;
+  viewingTaskId = null;
   appDialog.removeAttribute("data-kind");
   appDialogEsc.hidden = true;
   closeDialog(appDialog);
@@ -4852,6 +5148,9 @@ billingChip.addEventListener("click", () => {
     showBanner(e instanceof Error ? e.message : String(e)),
   );
 });
+taskChip.addEventListener("click", () => {
+  void openHeaderTask();
+});
 btnSettings.addEventListener("click", () => openSettings());
 btnSettingsClose.addEventListener("click", () => closeSettings());
 $("btn-app-dialog-close").addEventListener("click", () => closeAppDialog());
@@ -4979,6 +5278,12 @@ function hidePopovers() {
   slashMenu.hidden = true;
   promptHistoryEl.hidden = true;
   atMenu.hidden = true;
+  atPreviewSeq += 1;
+  atLineAnchor = null;
+  if (atPreviewTimer) {
+    window.clearTimeout(atPreviewTimer);
+    atPreviewTimer = 0;
+  }
   closeComposerMenu();
   syncComposerHint();
 }
@@ -5041,24 +5346,196 @@ function openJump() {
 }
 
 function renderAtMenu() {
-  atMenu.hidden = atItems.length === 0;
+  if (atItems.length === 0) {
+    atMenu.hidden = true;
+    atMenu.replaceChildren();
+    atListKey = "";
+    atPreviewPath = null;
+    return;
+  }
+  if (atIndex >= atItems.length) atIndex = Math.max(0, atItems.length - 1);
+  atMenu.hidden = false;
+  ensureAtChrome();
+  renderAtList();
+  syncAtSelection();
+  scheduleAtPreview(atItems[atIndex]);
+}
+
+function ensureAtChrome() {
+  let list = atMenu.querySelector(".at-list");
+  let preview = atMenu.querySelector(".at-preview");
+  if (list && preview) return;
   atMenu.replaceChildren();
+  list = document.createElement("div");
+  list.className = "at-list";
+  list.setAttribute("role", "listbox");
+  list.setAttribute("aria-label", "文件");
+  preview = document.createElement("div");
+  preview.className = "at-preview";
+  atMenu.append(list, preview);
+}
+
+function renderAtList() {
+  const list = atMenu.querySelector(".at-list");
+  if (!list) return;
+  const key = atItems.map((row) => `${row.kind}:${row.path}`).join("\n");
+  if (key === atListKey && list.childElementCount === atItems.length) return;
+  atListKey = key;
+  list.replaceChildren();
   atItems.forEach((row, i) => {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "slash-row";
-    b.setAttribute("aria-selected", i === atIndex ? "true" : "false");
+    b.setAttribute("role", "option");
     b.textContent = row.path;
+    b.addEventListener("pointerenter", () => {
+      if (atIndex === i) return;
+      atIndex = i;
+      atLineAnchor = null;
+      syncAtSelection();
+      scheduleAtPreview(row);
+    });
     b.addEventListener("click", () => acceptAt(row.path));
-    atMenu.append(b);
+    list.append(b);
   });
 }
 
-function acceptAt(path: string) {
+function syncAtSelection() {
+  const list = atMenu.querySelector(".at-list");
+  if (!list) return;
+  [...list.children].forEach((el, i) => {
+    el.setAttribute("aria-selected", i === atIndex ? "true" : "false");
+  });
+  const selected = list.children[atIndex];
+  if (selected instanceof HTMLElement) selected.scrollIntoView({ block: "nearest" });
+}
+
+function scheduleAtPreview(item: FuzzyMatchItem | undefined) {
+  if (atPreviewTimer) {
+    window.clearTimeout(atPreviewTimer);
+    atPreviewTimer = 0;
+  }
+  if (!item) return;
+  if (item.kind === "directory" || atPreviewCache.has(item.path)) {
+    void loadAtPreview(item);
+    return;
+  }
+  const pane = atMenu.querySelector(".at-preview");
+  if (pane && atPreviewPath !== item.path) renderAtPreviewNote(pane, item.path, "读取中…");
+  atPreviewTimer = window.setTimeout(() => {
+    atPreviewTimer = 0;
+    void loadAtPreview(item);
+  }, 60);
+}
+
+function renderAtPreviewHead(pane: Element, path: string, hint: string) {
+  const head = document.createElement("div");
+  head.className = "at-preview-head";
+  const name = document.createElement("span");
+  name.className = "at-preview-name";
+  name.textContent = path;
+  const meta = document.createElement("span");
+  meta.className = "at-preview-hint";
+  meta.textContent = hint;
+  head.append(name, meta);
+  pane.append(head);
+}
+
+function renderAtPreviewNote(pane: Element, path: string, note: string) {
+  pane.replaceChildren();
+  if (pane instanceof HTMLElement) pane.dataset.path = path;
+  renderAtPreviewHead(pane, path, note);
+}
+
+function renderAtPreviewLines(
+  pane: Element,
+  path: string,
+  hit: { lines: string[] | null; note: string },
+) {
+  pane.replaceChildren();
+  if (pane instanceof HTMLElement) pane.dataset.path = path;
+  if (!hit.lines) {
+    renderAtPreviewHead(pane, path, hit.note || "无法预览");
+    return;
+  }
+  renderAtPreviewHead(pane, path, "点行插入 :N · Shift 点选范围");
+  const body = document.createElement("div");
+  body.className = "at-preview-body";
+  hit.lines.forEach((text, i) => {
+    const n = i + 1;
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "at-line";
+    const ln = document.createElement("span");
+    ln.className = "at-ln";
+    ln.textContent = String(n);
+    const code = document.createElement("span");
+    code.className = "at-line-text";
+    code.textContent = text;
+    row.append(ln, code);
+    row.addEventListener("click", (ev) => {
+      if (ev.shiftKey && atLineAnchor != null) {
+        acceptAt(path, { start: atLineAnchor, end: n });
+      } else {
+        atLineAnchor = n;
+        acceptAt(path, { start: n, end: n });
+      }
+    });
+    body.append(row);
+  });
+  pane.append(body);
+}
+
+async function loadAtPreview(item: FuzzyMatchItem | undefined) {
+  const pane = atMenu.querySelector(".at-preview");
+  if (!pane || !item) return;
+  atPreviewPath = item.path;
+  if (item.kind === "directory") {
+    renderAtPreviewNote(pane, item.path, "目录 · Enter 插入路径");
+    return;
+  }
+  const cached = atPreviewCache.get(item.path);
+  if (cached) {
+    renderAtPreviewLines(pane, item.path, cached);
+    return;
+  }
+  const seq = ++atPreviewSeq;
+  renderAtPreviewNote(pane, item.path, "读取中…");
+  if (!acp.connected) {
+    renderAtPreviewNote(pane, item.path, "未连接，无法预览");
+    return;
+  }
+  try {
+    const raw = extResultPayload(
+      await acp.request("x.ai/fs/read_file", {
+        path: item.path,
+        sessionId,
+        cwd: atSearchRoot(),
+      }),
+    );
+    if (seq !== atPreviewSeq || atPreviewPath !== item.path) return;
+    const parsed = parseReadFileContent(raw);
+    const hit = parsed.binary
+      ? { lines: null, note: "二进制文件，无法预览" }
+      : { lines: previewFileLines(parsed.content), note: "" };
+    atPreviewCache.set(item.path, hit);
+    if (atPreviewCache.size > 24) {
+      const first = atPreviewCache.keys().next().value;
+      if (first) atPreviewCache.delete(first);
+    }
+    renderAtPreviewLines(pane, item.path, hit);
+  } catch (err) {
+    if (seq !== atPreviewSeq || atPreviewPath !== item.path) return;
+    renderAtPreviewNote(pane, item.path, err instanceof Error ? err.message : "无法预览");
+  }
+}
+
+function acceptAt(path: string, range?: LineRange | null) {
   const caret = promptEl.selectionStart ?? promptEl.value.length;
-  promptEl.value = applyAtAccept(promptEl.value, caret, path);
+  promptEl.value = applyAtAccept(promptEl.value, caret, path, range);
   hidePopovers();
   promptEl.focus();
+  syncComposerFilled();
 }
 
 function atSearchRoot(): string {
@@ -5582,6 +6059,10 @@ composer.addEventListener("drop", (ev) => {
   }
 });
 
+atMenu.addEventListener("mousedown", (ev) => {
+  ev.preventDefault();
+});
+
 promptEl.addEventListener("keydown", (ev) => {
   const action = mapComposerKey(
     ev.key,
@@ -5653,10 +6134,12 @@ promptEl.addEventListener("keydown", (ev) => {
   }
   if (action === "at-next") {
     atIndex = Math.min(atItems.length - 1, atIndex + 1);
+    atLineAnchor = null;
     renderAtMenu();
   }
   if (action === "at-prev") {
     atIndex = Math.max(0, atIndex - 1);
+    atLineAnchor = null;
     renderAtMenu();
   }
   if (action === "at-accept" && atItems[atIndex]) acceptAt(atItems[atIndex]!.path);
@@ -6255,6 +6738,16 @@ document.addEventListener("keydown", (ev) => {
   if (app.dataset.surface === "dashboard" && (ev.ctrlKey || ev.metaKey) && (ev.key === "x" || ev.key === "X")) {
     return;
   }
+  if (
+    (ev.ctrlKey || ev.metaKey) &&
+    (ev.key === "g" || ev.key === "G") &&
+    !isTypingTarget(ev.target) &&
+    app.dataset.surface === "session"
+  ) {
+    ev.preventDefault();
+    void openTasks();
+    return;
+  }
   const action = mapGlobalHotkey(
     ev.key,
     { ctrl: ev.ctrlKey, meta: ev.metaKey, shift: ev.shiftKey },
@@ -6314,6 +6807,7 @@ declare global {
       addComposerImage: (input: { mimeType: string; data: string; name?: string }) => void;
       openExportSheet: () => void;
       openCompactSheet: () => void;
+      seedTask: (input: { label?: string; command?: string; output?: string }) => void;
       openUsageSheet: () => void;
       applyBilling: (payload: Json) => void;
     };
@@ -6449,5 +6943,27 @@ window.__grokWebTest = {
         repoName: null,
       },
     );
+  },
+  seedTask: (input) => {
+    if (!sessionId) sessionId = "e2e-task";
+    applyTaskNotice(liveTasks, {
+      type: "start",
+      task: {
+        id: "e2e-task-1",
+        sessionId,
+        command: input.command || "npm run dev",
+        label: input.label || input.command || "npm run dev",
+        cwd: "",
+        kind: "bash",
+        running: true,
+        startedAt: Date.now() - 12_000,
+        endedAt: null,
+        exitCode: null,
+        signal: null,
+        output: input.output || "vite ready\n",
+        outputFile: "",
+      },
+    });
+    syncTaskChip();
   },
 };

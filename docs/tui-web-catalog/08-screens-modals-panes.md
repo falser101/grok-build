@@ -14,14 +14,14 @@
 | U-08 | Theme picker | `/theme` 实时预览，Esc 还原 | 设置里即时换 CSS | 是：`/theme` + 设置即时换 CSS |
 | U-09 | Model picker | `Ctrl+M`（非 prompt 焦点） | 顶栏下拉（接口列表） | 是 |
 | U-10 | Session picker | U 见 S-06 | 全屏路由 `#/sessions` 主区列表 | 是 |
-| U-11 | File search dropdown | I-11 | combobox | 是：composer `@` 下拉（I-11） |
+| U-11 | File search dropdown | I-11 | combobox | 是：composer `@` 下拉 + 行预览（I-11） |
 | U-12 | File line viewer | `@` 结果看行 | modal | 否。**备注：@ 结果行查看器 待讨论后再做。** |
 | U-13 | Slash dropdown | I-09 | combobox | 是 |
 | U-14 | Completion dropdown | 通用补全 | 同 | 是：`x.ai/suggest` 补全 |
 | U-15 | History search | `/history` | 同 | 是：`/history` |
 | U-16 | Queue pane | I-20 | 侧栏 | 是 |
 | U-17 | Todo pane | `Ctrl+T`；`[todo] badge_format` default/colon/comma | 侧栏 checklist；ACP plan entries → todo | 否。**备注：todo 侧栏 待讨论后再做。** |
-| U-18 | Tasks pane | `Ctrl+G` 全屏 | 后台任务列表 | 部分：`/tasks` 菜单提示不做。**备注：见 16。** |
+| U-18 | Tasks pane | `Ctrl+G` 全屏 | 后台任务列表 | 是：`/tasks` 模态 + 顶栏芯片点开日志（见 16） |
 | U-19 | Workflows overlay | `/workflows` 运行中，非定义目录 | 见 X | 部分：`/workflows` 菜单提示不做。**备注：见 16。** |
 | U-20 | Subagent catalog pane | 子 agent 目录 | 抽屉 | 部分：时间线有子 agent 行。**备注：目录抽屉见 16。** |
 | U-21 | Goal detail | `goal_detail` | 页 | 否。**备注：goal 详情 待讨论后再做。** |

@@ -12,7 +12,7 @@
 | I-08 | 鼠标悬停高亮 | `mouse_hover`。 | CSS :hover。 | 是 |
 | I-09 | Slash 下拉 | `/` 打开，模糊匹配，Tab/Enter 选。来源：shell builtins + pager builtins + skills。碰撞：内置占短名，skill 用 `scope:name`，菜单打徽章。 | 弹出 combobox。数据 = initialize `availableCommands` + 前端本地命令（theme 等）。 | 是 |
 | I-10 | Slash 参数 hint | 条目可有 argument_hint。 | 补全第二列。 | 是 |
-| I-11 | `@` 文件搜索 | 下拉 + `x.ai/search/fuzzy/open|change`，通知 `fuzzy/status`。行查看器。 | 弹层列表；选中插入路径 chip 或 `@path`。 | 是：根为当前会话 cwd（不是 agent HOME）；相对路径插入 |
+| I-11 | `@` 文件搜索 | 下拉 + `x.ai/search/fuzzy/open|change`，通知 `fuzzy/status`。行查看器。 | 弹层列表；选中插入路径 chip 或 `@path`。 | 是：根为当前会话 cwd；相对路径插入；列表旁预览文件行，点行插入 `@path:N` / Shift 点选 `@path:N-M`。不做 TUI vim visual / `/` 搜索 |
 | I-12 | 路径/shell token 补全 | `extensions/suggest`：file、path、history、ai、shell_token。 | 输入 debounce 调 suggest 扩展。 | 是（`x.ai/suggest` debounce） |
 | I-13 | Prompt 建议幽灵字 | `prompt_suggestions` 默认开。回合结束后小模型预测，Tab 接受。 | ghost text overlay。可关。 | 是（`x.ai/suggestPrompt` + Tab） |
 | I-14 | Follow-up 芯片 | `SubmitFollowUp`：**字面**发送，禁止当 slash 执行。 | 芯片 click = 原文 prompt。 | 是 |

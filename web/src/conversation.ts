@@ -471,9 +471,12 @@ export class ConversationTimeline {
       this.pushSys(text, eventId, replay);
       return [{ type: "redraw" }];
     }
-    if (kind.startsWith("subagent") || kind === "task_backgrounded") {
+    if (kind.startsWith("subagent")) {
       this.ingestSubagent(update, kind, eventId, replay);
       return [{ type: "redraw" }];
+    }
+    if (kind === "task_backgrounded" || kind === "task_completed") {
+      return [];
     }
     if (kind === "workflow_updated" || kind === "workflow") {
       this.ingestWorkflow(update, eventId, replay);

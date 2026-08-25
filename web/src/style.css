@@ -1189,7 +1189,7 @@ button:disabled {
 
 .task-row {
   display: grid;
-  grid-template-columns: 6rem 6rem minmax(0, 1fr);
+  grid-template-columns: 4.2rem 5.5rem minmax(0, 1fr);
   gap: 0.6rem;
   padding: 0.38rem 0.1rem;
   border-bottom: 1px solid var(--line);
@@ -1922,6 +1922,112 @@ code {
 
 #billing-chip[data-hot="1"] {
   color: var(--edit);
+}
+
+#header-task {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: min(28rem, 48vw);
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.18rem 0.7rem;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#header-task[hidden] {
+  display: none;
+}
+
+#header-task::before {
+  content: "";
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--ok);
+  flex: 0 0 auto;
+}
+
+#header-task:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.task-row.task-live {
+  grid-template-columns: 4.2rem 5.5rem minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.task-stop {
+  font-size: 0.75rem;
+  padding: 0.12rem 0.45rem;
+}
+
+.task-row.task-live {
+  cursor: pointer;
+}
+
+#app-dialog[data-kind="tasks"] .app-dialog-panel,
+#app-dialog[data-kind="task-detail"] .app-dialog-panel {
+  width: min(86rem, calc(100vw - 32px));
+  height: min(90vh, 56rem);
+  max-height: min(90vh, 56rem);
+  overflow: hidden;
+}
+
+#app-dialog[data-kind="tasks"] .app-dialog-body,
+#app-dialog[data-kind="task-detail"] .app-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+}
+
+#app-dialog[data-kind="tasks"] .task-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.task-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.85rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  flex: 0 0 auto;
+}
+
+.task-detail-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+
+.task-log {
+  margin: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .sheet-section {
@@ -2919,10 +3025,12 @@ html[data-theme="light"] .ansi-cyan { color: #0e7474; }
 #at-menu {
   position: absolute;
   left: 0;
-  right: 0;
   bottom: calc(100% + 6px);
-  max-height: 16rem;
-  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(10rem, 15rem) minmax(14rem, 1fr);
+  width: min(42rem, calc(100vw - 2rem));
+  max-height: 18rem;
+  overflow: hidden;
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -2931,6 +3039,103 @@ html[data-theme="light"] .ansi-cyan { color: #0e7474; }
 
 #at-menu[hidden] {
   display: none;
+}
+
+.at-list {
+  overflow: auto;
+  border-right: 1px solid var(--line);
+  min-height: 0;
+}
+
+.at-preview {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.at-preview-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.65rem 0.3rem;
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+
+.at-preview-name {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.at-preview-hint {
+  color: var(--muted);
+  font-size: 0.68rem;
+  flex: 0 0 auto;
+}
+
+.at-preview-body {
+  overflow: auto;
+  flex: 1 1 auto;
+  padding: 0.2rem 0;
+}
+
+.at-line {
+  display: grid;
+  grid-template-columns: 3.4ch 1fr;
+  gap: 0.7rem;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  text-align: left;
+  padding: 0 0.65rem;
+  cursor: pointer;
+}
+
+.at-line:hover {
+  background: var(--bg-3);
+}
+
+.at-ln {
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+}
+
+.at-line-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+@media (max-width: 640px) {
+  #at-menu {
+    grid-template-columns: 1fr;
+    width: 100%;
+    max-height: 22rem;
+  }
+
+  .at-list {
+    max-height: 8rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .at-preview {
+    min-height: 10rem;
+  }
 }
 
 #find-bar,

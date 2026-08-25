@@ -18,7 +18,7 @@ Web **不要** 1:1 复制终端改键矩阵。语义对齐 + 屏幕按钮。下�
 | K-12 | Shift+Tab 模式 | | 分段控件 | 是：Shift+Tab 循环模式 |
 | K-13 | Ctrl+B 后台 | 前台命令转后台 | 任务按钮 | 否。**备注：前台转后台 待讨论后再做。** |
 | K-14 | Ctrl+T todos | | 侧栏 | 否。**备注：Ctrl+T todos 待讨论后再做。** |
-| K-15 | Ctrl+G | 全屏 tasks；Minimal 外编 | 任务页 | 否。**备注：Ctrl+G 任务页 待讨论后再做。** |
+| K-15 | Ctrl+G | 全屏 tasks；Minimal 外编 | 任务页 | 是：会话页 Ctrl+G 打开任务（Dashboard 仍是切排序） |
 | K-16 | Ctrl+L | 非 VS Code：扩展模态；VS Code 家族：interject | 永不绑 Ctrl+L（浏览器焦点地址栏）。按钮 | 是：不绑 Ctrl+L；插入走芯片 |
 | K-17 | Ctrl+. / Ctrl+X 速查 | 无 KKP 用 Ctrl+X | `?` | 是：? / Ctrl+. 七条（Ctrl+P 面板、Ctrl+Enter 立即发送、Shift+Tab 模式、Ctrl+; 队列、Ctrl+, 设置、? / Ctrl+. 速查、Ctrl+\\ 总览）；Esc 只在底「Esc 关闭」 |
 | K-18 | F2 设置 | Ctrl+, / Cmd+, | `g ,` 或齿轮 | 是：齿轮 / Ctrl+, |

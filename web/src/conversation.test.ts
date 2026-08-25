@@ -445,6 +445,19 @@ test("subagent finished keeps output on the same row", () => {
   assert.equal(row?.open, false);
 });
 
+test("task_backgrounded is not turned into a subagent row", () => {
+  const t = new ConversationTimeline();
+  t.apply("session/update", {
+    update: {
+      sessionUpdate: "task_backgrounded",
+      task_id: "bg-1",
+      command: "npm run dev",
+    },
+  });
+  assert.equal(t.items.some((i) => i.kind === "subagent"), false);
+  assert.deepEqual(listSubagentTasks(t.items), []);
+});
+
 test("listSubagentTasks is empty without live rows and does not invent names", () => {
   assert.deepEqual(listSubagentTasks([]), []);
   const t = new ConversationTimeline();

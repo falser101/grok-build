@@ -1,6 +1,6 @@
 # 21 配置层、沙箱、记忆、规则、模型
 
-Agent 侧能力；Web 主要是展示/开关，不重新实现。
+Agent 侧能力；Web 主要是展示/开关，不重新实现。这版不写新功能。`/memory` `/flush` `/dream` `/remember` 发给 Agent，不做文件列表。设置只写前端偏好，不写回 config.toml，不改成页面或右栏，不加设置项。部分项的 NOTE 不要做成开关。不要重开有帮助/没帮助。
 
 | ID | 功能点 | TUI | Web 怎么做 | Web 已实现 |
 |---|---|---|---|---|
@@ -14,7 +14,7 @@ Agent 侧能力；Web 主要是展示/开关，不重新实现。
 | Z-08 | 项目规则 | `12-project-rules.md` AGENTS.md 等 | Agent prompt；Web 可「已加载 N 条」 | Agent 已有 |
 | Z-09 | `--rules` | 追加系统提示 | session `_meta.rules` | 否。**备注：session rules UI 待讨论后再做。** |
 | Z-10 | systemPromptOverride | | 高级/内部 | 否（不做）：内部 |
-| Z-11 | Memory 后端 | GROK_MEMORY / experimental | `/memory` 门闩 | 部分：`/memory` 发给 Agent |
+| Z-11 | Memory 后端 | GROK_MEMORY / experimental | `/memory` 门闩 | 部分：`/memory` 发给 Agent。不做文件列表。 |
 | Z-12 | `/flush` `/dream` `/remember` | | 命令 | 是：`/flush` `/dream` 发给 Agent；`/remember` 发给 Agent |
 | Z-13 | 记忆文件列表 | `MemoryFiles` 通知 | modal | 否。**备注：记忆文件列表 待讨论后再做。** |
 | Z-14 | 记忆路径 | `~/.grok/memory/` | 只读打开 | 否。**备注：打开记忆文件 待讨论后再做。** |

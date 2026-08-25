@@ -432,12 +432,22 @@
       </div>
 
       <div id="settings-modal" hidden>
-        <div class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="settings-panel settings-split" role="dialog" aria-modal="true" aria-labelledby="settings-title">
           <div class="settings-head">
             <h2 id="settings-title">设置</h2>
             <button id="btn-settings-close" type="button">关闭</button>
           </div>
-          <section class="settings-group">
+          <div class="settings-layout">
+            <nav class="settings-nav" id="settings-nav" aria-label="设置">
+              <button type="button" data-settings-pane="appearance" aria-selected="true">外观</button>
+              <button type="button" data-settings-pane="editor">编辑</button>
+              <button type="button" data-settings-pane="permission">权限</button>
+              <button type="button" data-settings-pane="cwd">工作目录</button>
+              <button type="button" data-settings-pane="skills">Skills</button>
+              <button type="button" data-settings-pane="mcp">MCP</button>
+            </nav>
+            <div class="settings-panes">
+          <section class="settings-group settings-pane" data-settings-pane="appearance">
             <h3>外观</h3>
             <div class="grow theme-pref-field">
               <span class="theme-pref-label">外观</span>
@@ -468,7 +478,7 @@
               显示时间线
             </label>
           </section>
-          <section class="settings-group">
+          <section class="settings-group settings-pane" data-settings-pane="editor" hidden>
             <h3>编辑</h3>
             <label class="check">
               <input id="enter-sends" type="checkbox" checked />
@@ -479,7 +489,7 @@
               合并连续跟进
             </label>
           </section>
-          <section class="settings-group">
+          <section class="settings-group settings-pane" data-settings-pane="permission" hidden>
             <h3>权限</h3>
             <label class="grow">
               权限
@@ -498,13 +508,12 @@
               </select>
             </label>
           </section>
-          <section class="settings-group">
+          <section class="settings-group settings-pane" data-settings-pane="cwd" hidden>
             <h3>工作目录</h3>
             <label class="grow">
               cwd
               <input id="cwd" spellcheck="false" autocomplete="off" />
             </label>
-          </section>
           <details class="dock-advanced" open>
             <summary>高级连接</summary>
             <div class="advanced-fields">
@@ -532,6 +541,16 @@
             <button id="btn-worktree-gc" type="button">GC（dry-run）</button>
             <pre id="worktree-out" class="muted"></pre>
           </details>
+          </section>
+          <section class="settings-pane" data-settings-pane="skills" hidden>
+            <div id="settings-skills" class="settings-ext"></div>
+          </section>
+          <section class="settings-pane" data-settings-pane="mcp" hidden>
+            <div id="settings-mcp" class="settings-ext"></div>
+          </section>
+            </div>
+          </div>
+          <p class="settings-esc">Esc 关闭</p>
         </div>
       </div>
 

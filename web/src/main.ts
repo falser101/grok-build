@@ -149,6 +149,7 @@ import {
   LATER_TOAST,
   applyCompactMode,
   loadCompactMode,
+  menuSlashCommands,
   mergeSlashMenu,
   nextThemePref,
   parseEffortArg,
@@ -398,6 +399,9 @@ const btnImportClaude = $<HTMLButtonElement>("btn-import-claude");
 const sessionListEl = $("session-list");
 const sessionPopover = $("session-popover");
 const settingsModal = $("settings-modal");
+const settingsNav = $("settings-nav");
+const settingsSkills = $("settings-skills");
+const settingsMcp = $("settings-mcp");
 const btnSettings = $<HTMLButtonElement>("btn-settings");
 const btnSettingsClose = $<HTMLButtonElement>("btn-settings-close");
 const btnHeaderModel = $<HTMLButtonElement>("btn-header-model");
@@ -3502,11 +3506,11 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
     return true;
   }
   if (name === "skills") {
-    void openExtensions("skills");
+    void openSettings("skills");
     return true;
   }
   if (name === "mcps") {
-    void openExtensions("mcps");
+    void openSettings("mcp");
     return true;
   }
   if (name === "tasks") {
@@ -4486,7 +4490,97 @@ btnSwitch.addEventListener("click", () => {
   closeSettings();
   logout({ acp: false }).catch((e) => showBanner(e instanceof Error ? e.message : String(e)));
 });
-function openSettings() {
+type SettingsPane = "appearance" | "editor" | "permission" | "cwd" | "skills" | "mcp";
+
+function showSettingsPane(pane: SettingsPane) {
+  for (const btn of settingsNav.querySelectorAll<HTMLButtonElement>("[data-settings-pane]")) {
+    btn.setAttribute("aria-selected", btn.dataset.settingsPane === pane ? "true" : "false");
+  }
+  for (const section of settingsModal.querySelectorAll<HTMLElement>(".settings-pane")) {
+    section.hidden = section.dataset.settingsPane !== pane;
+  }
+  if (pane === "skills" || pane === "mcp") void fillSettingsExt(pane);
+}
+
+function paintSettingsSkills(rows: SkillRow[]) {
+  settingsSkills.replaceChildren();
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "ext-empty";
+    empty.textContent = "还没有";
+    settingsSkills.append(empty);
+    return;
+  }
+  const table = document.createElement("table");
+  table.className = "settings-table";
+  const head = document.createElement("thead");
+  const hr = document.createElement("tr");
+  for (const label of ["名字", "来源", "开/关"]) {
+    const th = document.createElement("th");
+    th.textContent = label;
+    hr.append(th);
+  }
+  head.append(hr);
+  const body = document.createElement("tbody");
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    for (const text of [row.name, row.source, skillEnabledLabel(row.enabled)]) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      tr.append(td);
+    }
+    body.append(tr);
+  }
+  table.append(head, body);
+  settingsSkills.append(table);
+}
+
+function paintSettingsMcp(rows: McpRow[]) {
+  settingsMcp.replaceChildren();
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "ext-empty";
+    empty.textContent = "还没有";
+    settingsMcp.append(empty);
+    return;
+  }
+  const table = document.createElement("table");
+  table.className = "settings-table";
+  const head = document.createElement("thead");
+  const hr = document.createElement("tr");
+  for (const label of ["名字", "状态", "工具数"]) {
+    const th = document.createElement("th");
+    th.textContent = label;
+    hr.append(th);
+  }
+  head.append(hr);
+  const body = document.createElement("tbody");
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    const name = document.createElement("td");
+    name.textContent = row.name;
+    const status = document.createElement("td");
+    const dot = document.createElement("i");
+    dot.className = "ext-dot";
+    dot.dataset.state = mcpStatusKind(row.status);
+    status.append(dot);
+    const count = document.createElement("td");
+    count.textContent = String(row.toolCount);
+    tr.append(name, status, count);
+    body.append(tr);
+  }
+  table.append(head, body);
+  settingsMcp.append(table);
+}
+
+async function fillSettingsExt(_pane: "skills" | "mcp") {
+  const [skills, mcps] = await Promise.all([fetchSkillRows(), fetchMcpRows()]);
+  paintSettingsSkills(skills);
+  paintSettingsMcp(mcps);
+}
+
+function openSettings(pane: SettingsPane = "appearance") {
+  showSettingsPane(pane);
   openDialog(settingsModal);
 }
 
@@ -4904,7 +4998,7 @@ function showLaterStub(name: string) {
 }
 
 function paletteSlashList() {
-  return mergeSlashMenu(
+  return menuSlashCommands(
     LOCAL_SLASH,
     (snapshot?.availableCommands ?? []).map((c) => ({
       name: c.name,
@@ -5153,6 +5247,20 @@ taskChip.addEventListener("click", () => {
 });
 btnSettings.addEventListener("click", () => openSettings());
 btnSettingsClose.addEventListener("click", () => closeSettings());
+settingsNav.addEventListener("click", (ev) => {
+  const btn = (ev.target as HTMLElement | null)?.closest?.("button[data-settings-pane]");
+  const pane = btn?.getAttribute("data-settings-pane");
+  if (
+    pane === "appearance" ||
+    pane === "editor" ||
+    pane === "permission" ||
+    pane === "cwd" ||
+    pane === "skills" ||
+    pane === "mcp"
+  ) {
+    showSettingsPane(pane);
+  }
+});
 $("btn-app-dialog-close").addEventListener("click", () => closeAppDialog());
 appDialog.addEventListener("click", (ev) => {
   if (ev.target === appDialog) closeAppDialog();
@@ -5830,7 +5938,7 @@ function renderSlashMenu() {
     syncComposerHint();
     return;
   }
-  const commands: SlashCommand[] = mergeSlashMenu(
+  const commands: SlashCommand[] = menuSlashCommands(
     LOCAL_SLASH,
     (snapshot?.availableCommands ?? []).map((c) => ({
       name: c.name,

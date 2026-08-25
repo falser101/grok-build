@@ -8,6 +8,8 @@ import {
   loadCompactMode,
   canonicalSlashName,
   helpLines,
+  menuSlashCommands,
+  menuSlashKind,
   mergeSlashMenu,
   nextThemePref,
   parseEffortArg,
@@ -197,6 +199,32 @@ test("slash menu lists memory commands as send-to-agent", () => {
     args: "buy milk",
     text: "/remember buy milk",
   });
+});
+
+test("menuSlashCommands is the shortlist plus callable skills", () => {
+  const menu = menuSlashCommands(LOCAL_SLASH, [
+    { name: "user:review", description: "skill", argumentHint: null },
+    { name: "theme", description: "should hide", argumentHint: null },
+    { name: "memory", description: "should hide", argumentHint: null },
+    { name: "skills", description: "should hide", argumentHint: null },
+    { name: "mcps", description: "should hide", argumentHint: null },
+    { name: "hooks", description: "这一档不做", argumentHint: null },
+  ]);
+  assert.deepEqual(
+    menu.map((c) => c.name),
+    ["compact", "rewind", "recap", "btw", "find", "jump", "history", "copy", "export", "loop", "tasks", "user:review"],
+  );
+  assert.equal(menuSlashKind("compact"), "shell");
+  assert.equal(menuSlashKind("loop"), "shell");
+  assert.equal(menuSlashKind("btw"), "pager");
+  assert.equal(menuSlashKind("rewind"), "pager");
+  assert.equal(menuSlashKind("tasks"), "pager");
+  assert.equal(menu.find((c) => c.name === "compact")?.kind, "shell");
+  assert.equal(menu.find((c) => c.name === "btw")?.kind, "pager");
+  assert.equal(menu.find((c) => c.name === "user:review")?.kind, "skill");
+  assert.ok(!menu.some((c) => ["theme", "settings", "skills", "mcps", "memory", "dream", "flush", "remember", "doctor", "login", "help", "model", "yolo", "plan", "new", "dashboard", "hooks"].includes(c.name)));
+  assert.equal(planSlash("/btw hi").kind, "send");
+  assert.equal(planSlash("/memory").kind, "send");
 });
 
 test("skillUsedFromPrompt only matches colon skill send", () => {

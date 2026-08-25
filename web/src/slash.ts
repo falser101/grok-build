@@ -267,6 +267,7 @@ export const LOCAL_SLASH: SlashCommand[] = [
   { name: "privacy", description: "编码数据与隐私", argumentHint: null },
   { name: "btw", description: "旁路提问", argumentHint: "question" },
   { name: "compact", description: "压缩上下文（发给 Agent）", argumentHint: "note" },
+  { name: "loop", description: "发给 Agent", argumentHint: null },
   { name: "memory", description: "发给 Agent", argumentHint: null },
   { name: "mem", description: "发给 Agent", argumentHint: null },
   { name: "flush", description: "发给 Agent", argumentHint: null },
@@ -304,6 +305,62 @@ export function slashBadgeLabel(kind: SlashKind): "P" | "S" | "skill" {
 
 export function annotateSlash(cmd: SlashCommand, source: "local" | "available"): SlashCommand {
   return { ...cmd, kind: cmd.kind ?? slashKind(cmd.name, source) };
+}
+
+/** Composer / palette shortlist. Hand-typed names stay in LOCAL_SLASH. */
+export const SLASH_MENU_NAMES = [
+  "compact",
+  "rewind",
+  "recap",
+  "btw",
+  "find",
+  "jump",
+  "history",
+  "copy",
+  "export",
+  "loop",
+  "tasks",
+] as const;
+
+const SLASH_MENU = new Set<string>(SLASH_MENU_NAMES);
+const SLASH_MENU_SHELL = new Set(["compact", "loop"]);
+
+export function isCallableSkillName(name: string): boolean {
+  return name.includes(":") || canonicalSlashName(name).includes(":");
+}
+
+export function menuSlashKind(name: string): SlashKind {
+  const canonical = canonicalSlashName(name);
+  if (isCallableSkillName(name) || isCallableSkillName(canonical)) return "skill";
+  if (SLASH_MENU_SHELL.has(canonical)) return "shell";
+  if (SLASH_MENU.has(canonical)) return "pager";
+  return slashKind(name);
+}
+
+export function menuSlashCommands(
+  local: SlashCommand[],
+  available: SlashCommand[] = [],
+): SlashCommand[] {
+  const byName = new Map<string, SlashCommand>();
+  for (const cmd of local) byName.set(cmd.name.toLowerCase(), cmd);
+  const out: SlashCommand[] = [];
+  const seen = new Set<string>();
+  for (const name of SLASH_MENU_NAMES) {
+    const cmd = byName.get(name);
+    if (!cmd) continue;
+    const key = cmd.name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...cmd, kind: menuSlashKind(cmd.name) });
+  }
+  for (const cmd of available) {
+    if (!isCallableSkillName(cmd.name)) continue;
+    const key = cmd.name.toLowerCase();
+    if (seen.has(key) || SLASH_MENU.has(canonicalSlashName(cmd.name))) continue;
+    seen.add(key);
+    out.push({ ...cmd, kind: "skill" });
+  }
+  return out;
 }
 
 export function mergeSlashMenu(

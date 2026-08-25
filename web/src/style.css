@@ -644,6 +644,97 @@ body {
   gap: 0.8rem;
 }
 
+.settings-panel.settings-split {
+  width: min(44rem, calc(100vw - 48px));
+}
+
+.settings-layout {
+  display: flex;
+  gap: 1rem;
+  min-height: 16rem;
+  align-items: stretch;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 0 0 7.4rem;
+}
+
+.settings-nav button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  padding: 0.38rem 0.55rem;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.settings-nav button[aria-selected="true"] {
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-3));
+  color: var(--ink);
+}
+
+.settings-panes {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.settings-pane[hidden] {
+  display: none;
+}
+
+.settings-esc {
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.settings-ext {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.settings-table th,
+.settings-table td {
+  text-align: left;
+  padding: 0.42rem 0.35rem;
+  border-bottom: 1px solid var(--line);
+  font-weight: 400;
+}
+
+.settings-table th {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.settings-table td {
+  color: var(--ink);
+}
+
+.settings-table .ext-dot {
+  display: inline-block;
+}
+
 .settings-head {
   display: flex;
   justify-content: space-between;

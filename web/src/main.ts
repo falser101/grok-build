@@ -141,6 +141,15 @@ import {
   wiredHelpCommands,
   type SlashKind,
 } from "./slash";
+import {
+  mcpStatusKind,
+  mcpToolCountLabel,
+  parseMcpList,
+  parseSkillsList,
+  skillEnabledLabel,
+  type McpRow,
+  type SkillRow,
+} from "./extensions";
 import { BlockHost } from "./blocking_view";
 import {
   CANCEL_SUBAGENTS_PREF_KEY,
@@ -465,7 +474,7 @@ let dashDeleteArmed: { id: string; at: number } | null = null;
 let paletteItems: PaletteItem[] = [];
 let paletteIndex = 0;
 let paletteQuery = "";
-type AppDialogKind = "palette" | "shortcuts" | "args" | "later" | "block" | "sheet" | null;
+type AppDialogKind = "palette" | "shortcuts" | "args" | "later" | "block" | "sheet" | "extensions" | null;
 let appDialogKind: AppDialogKind = null;
 timeline.opts.showThinking = composerPrefs.showThinking;
 timeline.opts.groupTools = composerPrefs.groupTools;
@@ -3365,6 +3374,14 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
     openSettings();
     return true;
   }
+  if (name === "skills") {
+    void openExtensions("skills");
+    return true;
+  }
+  if (name === "mcps") {
+    void openExtensions("mcps");
+    return true;
+  }
   if (name === "usage") {
     await showUsage(entry);
     return true;
@@ -4332,6 +4349,108 @@ btnSwitch.addEventListener("click", () => {
 });
 function openSettings() {
   openDialog(settingsModal);
+}
+
+async function fetchSkillRows(): Promise<SkillRow[]> {
+  const cwd = workspaceCwd();
+  if (!acp.connected || !cwd) return [];
+  try {
+    return parseSkillsList(extResultPayload(await acpCall("x.ai/skills/list", { cwd })));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchMcpRows(): Promise<McpRow[]> {
+  if (!acp.connected) return [];
+  try {
+    return parseMcpList(
+      extResultPayload(
+        await acpCall("x.ai/mcp/list", {
+          ...(sessionId ? { sessionId } : {}),
+          cache: true,
+        }),
+      ),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function paintExtensions(tab: "skills" | "mcps", skills: SkillRow[], mcps: McpRow[]) {
+  appDialogBody.replaceChildren();
+  const tabs = document.createElement("div");
+  tabs.className = "mode-seg ext-tabs";
+  tabs.setAttribute("role", "tablist");
+  for (const [id, label] of [
+    ["skills", "Skills"],
+    ["mcps", "MCP"],
+  ] as const) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = label;
+    btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-selected", id === tab ? "true" : "false");
+    btn.addEventListener("click", () => {
+      void openExtensions(id);
+    });
+    tabs.append(btn);
+  }
+  const list = document.createElement("div");
+  list.className = "ext-list";
+  const rows = tab === "skills" ? skills : mcps;
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "ext-empty";
+    empty.textContent = "还没有";
+    list.append(empty);
+  } else if (tab === "skills") {
+    for (const row of skills) {
+      const item = document.createElement("div");
+      item.className = "ext-row";
+      const left = document.createElement("div");
+      left.className = "ext-copy";
+      const name = document.createElement("span");
+      name.className = "ext-name";
+      name.textContent = row.name;
+      const src = document.createElement("span");
+      src.className = "ext-meta";
+      src.textContent = row.source;
+      left.append(name);
+      if (row.source) left.append(src);
+      const state = document.createElement("span");
+      state.className = "ext-state";
+      state.textContent = skillEnabledLabel(row.enabled);
+      item.append(left, state);
+      list.append(item);
+    }
+  } else {
+    for (const row of mcps) {
+      const item = document.createElement("div");
+      item.className = "ext-row";
+      const left = document.createElement("div");
+      left.className = "ext-copy";
+      const head = document.createElement("span");
+      head.className = "ext-name";
+      const dot = document.createElement("i");
+      dot.className = "ext-dot";
+      dot.dataset.state = mcpStatusKind(row.status);
+      head.append(dot, document.createTextNode(row.name));
+      left.append(head);
+      const count = document.createElement("span");
+      count.className = "ext-meta";
+      count.textContent = mcpToolCountLabel(row.toolCount);
+      item.append(left, count);
+      list.append(item);
+    }
+  }
+  appDialogBody.append(tabs, list);
+  showAppDialog("扩展", "extensions");
+}
+
+async function openExtensions(tab: "skills" | "mcps") {
+  const [skills, mcps] = await Promise.all([fetchSkillRows(), fetchMcpRows()]);
+  paintExtensions(tab, skills, mcps);
 }
 
 function closeSettings() {

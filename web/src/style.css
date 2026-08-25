@@ -3577,6 +3577,82 @@ html[data-compact="1"] .bubble .who {
   width: min(26rem, calc(100vw - 48px));
 }
 
+#app-dialog[data-kind="extensions"] .app-dialog-panel {
+  width: min(28rem, calc(100vw - 48px));
+}
+
+.ext-tabs {
+  width: 100%;
+}
+
+.ext-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-height: 22rem;
+  overflow: auto;
+}
+
+.ext-empty {
+  margin: 0.6rem 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.ext-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.42rem 0.15rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.ext-row:last-child {
+  border-bottom: 0;
+}
+
+.ext-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.ext-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.ext-meta,
+.ext-state {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.ext-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: 0 0 auto;
+}
+
+.ext-dot[data-state="ready"] {
+  background: var(--ok);
+}
+
+.ext-dot[data-state="busy"] {
+  background: var(--ink);
+}
+
+.ext-dot[data-state="down"] {
+  background: var(--danger);
+}
+
 .sheet-stack {
   display: flex;
   flex-direction: column;

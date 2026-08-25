@@ -56,7 +56,8 @@ test("planSlash classifies local, send, later, forbidden", () => {
   assert.deepEqual(planSlash("/gboom"), { kind: "forbidden", name: "gboom" });
   assert.deepEqual(planSlash("/minimal"), { kind: "forbidden", name: "minimal" });
   assert.deepEqual(planSlash("/vim-mode"), { kind: "forbidden", name: "vim-mode" });
-  assert.equal(planSlash("/skills").kind, "later");
+  assert.deepEqual(planSlash("/skills"), { kind: "local", name: "skills", args: "" });
+  assert.deepEqual(planSlash("/mcps"), { kind: "local", name: "mcps", args: "" });
   assert.equal(planSlash("/imagine").kind, "later");
   assert.equal(planSlash("/settings").kind, "local");
   assert.equal(planSlash("/share").kind, "local");
@@ -160,6 +161,8 @@ test("wired help lists built-ins we ship, not an external site", () => {
   assert.ok(wired.some((c) => c.name === "help"));
   assert.ok(wired.some((c) => c.name === "model"));
   assert.ok(wired.some((c) => c.name === "theme"));
+  assert.ok(wired.some((c) => c.name === "skills"));
+  assert.ok(wired.some((c) => c.name === "mcps"));
   assert.ok(!wired.some((c) => c.name === "hooks"));
   assert.ok(!wired.some((c) => c.name === "gboom"));
   const help = helpLines();

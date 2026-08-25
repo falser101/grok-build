@@ -9,7 +9,7 @@ Pager 会先拦截同名。Web 必须自己实现所有 **P**，**S** 发给 Age
 
 可见性：Minimal 隐藏 dashboard/find/jump/timeline/theme/tutorial/workflows；全屏隐藏 expand/edit-prompt。
 
-Web `/` 只展示：`compact` `rewind` `recap` `btw` `find` `jump` `history` `copy` `export` `loop` `tasks` + `availableCommands` 里可调用 skill。徽章：P = rewind recap btw find jump history copy export tasks；S = compact loop；skill = 可调用 skill。`/skills` `/mcps` 不进斜杠和命令面板，手打开设置对应栏。系统全局 slash（remember/flush/dream/memory/theme/settings/doctor/login/help/model/yolo/plan/new/dashboard…）不进 `/` 菜单，不要「这一档不做」堆。输入 `/` 时在 composer 上方模糊补全。Tab 只补全进输入框，Enter 才执行。`/help` 是会话内卡片，不是外站。
+Web `/` 菜单只留对话短名单：`compact` `rewind` `recap` `btw` `find` `jump` `history` `copy` `export` `loop` `tasks` + `availableCommands` 里带冒号的 skill。徽章：P = rewind recap btw find jump history copy export tasks；S = compact loop；skill = 带冒号的 skill。theme/settings/help/model/yolo/plan/new/dashboard/doctor/login/memory/dream/flush/remember/home 以及 skills/mcps 都不进 `/` 菜单和命令面板。手打 `/skills` `/mcps` 仍打开设置对应栏。没有「这一档不做」toast。输入 `/` 时在 composer 上方模糊补全。Tab 只补全进输入框，Enter 才执行。`/help` 是会话内卡片，不是外站。
 
 ## Pager 本地
 

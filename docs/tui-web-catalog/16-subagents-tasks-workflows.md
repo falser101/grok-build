@@ -4,7 +4,7 @@
 |---|---|---|---|---|
 | X-01 | 子 agent 生成 | `SubagentSpawned` 在 parent 通道，先于 child prompt | 父时间线一行 + 可展开 | 部分：父时间线一行（类型徽章 + 描述） |
 | X-02 | 子 agent 进度 | `SubagentProgress` ~2s：turns、tools、tokens、errors | 进度条 | 部分：同一 childSessionId 就地写 activity |
-| X-03 | 子 agent 结束 | `SubagentFinished` completed/failed/cancelled + output | 结果折叠 | 部分：同一行改 status。**备注：输出折叠 {NOTE}。** |
+| X-03 | 子 agent 结束 | `SubagentFinished` completed/failed/cancelled + output | 结果折叠 | 是：三角展开 Finished 输出只读。本轮浏览器环境无子代理行，展开未测。 |
 | X-04 | 点进子会话 | 映射 child_session_id | 抽屉 load 子 session（只读或可跟） | 否。**备注：子 agent/任务/工作流面板 待讨论后再做。** |
 | X-05 | 取消子 agent | `x.ai/subagent/cancel`；取消面板选项 | 按钮 | 否。**备注：子 agent/任务/工作流面板 待讨论后再做。** |
 | X-06 | capability_mode | read-only 等 | 徽章 | 否。**备注：子 agent/任务/工作流面板 待讨论后再做。** |
@@ -38,5 +38,5 @@
 | X-34 | 子 agent 类型 explore/plan/general | | 图标 | 部分：类型徽章文字 |
 | X-35 | worktree 隔离子 agent | Agent 侧 | 徽章「wt」 | Agent 已有 |
 | X-36 | `will_wake` 字段 | TUI 不再消费；保留兼容 | 可忽略或「将自动继续」 | 否。**备注：子 agent/任务/工作流面板 待讨论后再做。** |
-| X-37 | `/tasks` | 打开任务面板 | 路由 | 否。**备注：子 agent/任务/工作流面板 待讨论后再做。** |
+| X-37 | `/tasks` | 打开任务面板 | 路由 | 是：/tasks 和命令面板只读模态，空「还没有」，点行不进子会话。 |
 | X-38 | 任务排队 coordinator | 内部 | 只展示队列长度若有 | Agent 已有 |

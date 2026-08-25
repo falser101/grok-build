@@ -16,6 +16,7 @@ import {
   composerSendAllowed,
   consentAlreadyAcked,
   defaultFolderTrustOutcome,
+  doctorChecks,
   doctorCopy,
   folderTrustOutcomeFromUser,
   handshakePlan,
@@ -240,6 +241,20 @@ test("doctor copy names 401 and process-not-running", () => {
   assert.match(unauthorized, /secret/);
   const down = doctorCopy("process-down");
   assert.match(down, /进程未起/);
+  const ok = doctorChecks("ok");
+  assert.deepEqual(ok.map((r) => r.status), ["过", "过", "过"]);
+  assert.equal(ok[0]?.reason, "本机 serve 已响应");
+  assert.equal(ok[1]?.reason, "握手成功");
+  assert.equal(ok[2]?.reason, "会话已建立");
+  const failDown = doctorChecks("process-down");
+  assert.equal(failDown[0]?.status, "不过");
+  assert.equal(failDown[0]?.reason, "进程未起");
+  assert.equal(failDown[1]?.status, "未查");
+  assert.equal(failDown[2]?.status, "未查");
+  const failAuth = doctorChecks("unauthorized");
+  assert.equal(failAuth[0]?.reason, "secret 不对");
+  assert.equal(failAuth[1]?.status, "未查");
+  assert.doesNotMatch(failAuth.map((r) => r.reason).join(" "), /ECONNREFUSED|5173|401/);
 });
 
 test("welcome snapshot parses version cwd commands and hides claude import when absent", () => {

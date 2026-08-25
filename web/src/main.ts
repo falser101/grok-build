@@ -32,7 +32,8 @@ import {
   classifyConnectFailure,
   composerSendAllowed,
   consentAlreadyAcked,
-  doctorCopy,
+  doctorChecks,
+  type DoctorKind,
   extResultPayload,
   folderTrustOutcomeFromUser,
   handshakePlan,
@@ -347,7 +348,8 @@ const turnActionsEl = $("turn-actions");
 const connecting = $("connecting");
 const connectingCopy = $("connecting-copy");
 const doctor = $("doctor");
-const doctorCopyEl = $("doctor-copy");
+const doctorRowsEl = $("doctor-rows");
+const btnDoctorRetry = $("btn-doctor-retry");
 const loginEl = $("login");
 const loginHint = $("login-hint");
 const btnLoginPrimary = $<HTMLButtonElement>("btn-login-primary");
@@ -2936,15 +2938,46 @@ function setConnectedUi(on: boolean) {
   btnDisconnect.disabled = !on;
 }
 
+function closeDoctorOverlay() {
+  doctor.classList.remove("overlay");
+  if (app.dataset.surface !== "doctor") doctor.hidden = true;
+}
+
+function paintDoctor(kind: DoctorKind) {
+  const rows = doctorChecks(kind);
+  doctorRowsEl.replaceChildren();
+  for (const row of rows) {
+    const el = document.createElement("div");
+    el.className = "doctor-row";
+    el.dataset.status = row.status;
+    const label = document.createElement("span");
+    label.textContent = row.label;
+    const status = document.createElement("span");
+    status.className = "doctor-status";
+    status.textContent = row.status;
+    const reason = document.createElement("span");
+    reason.className = "doctor-reason";
+    reason.textContent = row.reason;
+    el.append(label, status, reason);
+    doctorRowsEl.append(el);
+  }
+  const standalone = kind !== "ok";
+  btnDoctorRetry.textContent = standalone ? "重试" : "关闭";
+  btnDoctorRetry.dataset.kind = standalone ? "retry" : "close";
+  doctor.hidden = false;
+  if (standalone) {
+    doctor.classList.remove("overlay");
+    showSurface("doctor");
+    setState("error", "连接失败");
+  } else {
+    doctor.classList.add("overlay");
+  }
+  applyComposerGate();
+}
+
 function showDoctor(err: unknown) {
   const message = err instanceof Error ? err.message : String(err);
-  const kind = classifyConnectFailure({ message });
-  const copy = doctorCopy(kind, message);
-  doctorCopyEl.textContent = copy;
-  showBanner(copy, kind);
-  showSurface("doctor");
-  setState("error", "连接失败");
-  applyComposerGate();
+  paintDoctor(classifyConnectFailure({ message }));
 }
 
 async function connect(): Promise<void> {
@@ -2967,6 +3000,8 @@ async function connect(): Promise<void> {
     await handshake(Boolean(sessionId));
     claimTabLock();
     setConnectedUi(true);
+    closeDoctorOverlay();
+    if (app.dataset.surface === "doctor") showSurface("session");
     applyComposerGate();
   } catch (e) {
     wantOpen = false;
@@ -3450,7 +3485,7 @@ async function runLocalSlash(local: { name: string; args: string }): Promise<boo
   }
   if (name === "doctor") {
     if (acp.connected) {
-      showBanner("连接正常。连不上 serve 时这里会做诊断。", "doctor");
+      paintDoctor("ok");
       return true;
     }
     showDoctor(new Error("未连接"));
@@ -4363,7 +4398,11 @@ document.addEventListener("visibilitychange", () => {
   const e = currentEntry();
   if (e) void recapSession(e, true).catch(() => undefined);
 });
-$("btn-doctor-retry").addEventListener("click", () => {
+btnDoctorRetry.addEventListener("click", () => {
+  if (btnDoctorRetry.dataset.kind === "close") {
+    closeDoctorOverlay();
+    return;
+  }
   connect().catch(() => {
     /* doctor */
   });
@@ -5909,6 +5948,7 @@ function firstEscOverlay(): string | null {
     btw: Boolean(timeline.items.find((it) => it.kind === "btw" && it.open !== false)),
   });
   if (overlay) return overlay;
+  if (!doctor.hidden && app.dataset.surface !== "doctor") return "doctor";
   if (app.dataset.surface === "dashboard") {
     if (dashQuery) return "dash-search";
     if (dashSelectedId) return "dash-select";
@@ -5931,6 +5971,7 @@ function closeEscOverlay(id: string) {
   } else if (id === "history") {
     hidePopovers();
   } else if (id === "sessionPopover") closeSessionPopover();
+  else if (id === "doctor") closeDoctorOverlay();
   else if (id === "btw") {
     const btw = timeline.items.find((it) => it.kind === "btw" && it.open !== false);
     if (btw) {

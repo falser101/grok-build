@@ -4088,6 +4088,62 @@ html[data-compact="1"] .bubble .who {
   z-index: 4;
 }
 
+#app[data-surface="doctor"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#app[data-surface="doctor"] #sidebar,
+#app[data-surface="doctor"] #sidebar-resizer,
+#app[data-surface="doctor"] #main-header {
+  display: none;
+}
+
+.doctor-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  width: min(28rem, 100%);
+}
+
+.doctor-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.doctor-row .doctor-status {
+  text-align: center;
+}
+
+.doctor-row[data-status="过"] .doctor-status {
+  color: var(--ok);
+}
+
+.doctor-row[data-status="不过"] .doctor-status,
+.doctor-row[data-status="不过"] .doctor-reason,
+.doctor-row[data-status="未查"] .doctor-status {
+  color: var(--muted);
+}
+
+.doctor-row .doctor-reason {
+  text-align: right;
+}
+
+#btn-doctor-retry[data-kind="retry"] {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+#btn-doctor-retry[data-kind="close"] {
+  background: var(--bg);
+}
+
 #rail-preview { pointer-events: auto; cursor: pointer; }
 
 .header-model-wrap {

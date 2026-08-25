@@ -362,6 +362,27 @@ export function classifyConnectFailure(input: {
   return "generic";
 }
 
+export type DoctorStatus = "过" | "不过" | "未查";
+export type DoctorKind = "ok" | ConnectFailureKind;
+export type DoctorRow = { label: string; status: DoctorStatus; reason: string };
+
+export function doctorChecks(kind: DoctorKind): DoctorRow[] {
+  if (kind === "ok") {
+    return [
+      { label: "serve 可达", status: "过", reason: "本机 serve 已响应" },
+      { label: "WS 鉴权", status: "过", reason: "握手成功" },
+      { label: "session initialize", status: "过", reason: "会话已建立" },
+    ];
+  }
+  const reason =
+    kind === "process-down" ? "进程未起" : kind === "unauthorized" ? "secret 不对" : "连接失败";
+  return [
+    { label: "serve 可达", status: "不过", reason },
+    { label: "WS 鉴权", status: "未查", reason: "" },
+    { label: "session initialize", status: "未查", reason: "" },
+  ];
+}
+
 export function doctorCopy(
   kind: ConnectFailureKind,
   detail?: string | null,

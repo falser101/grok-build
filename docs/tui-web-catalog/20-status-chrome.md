@@ -1,5 +1,7 @@
 # 20 底栏、Status Line、Credit、Tips
 
+这版不写新功能。chips 在输入框，不进顶栏。用量/额度不画顶栏。默认不画 TUI status line。不要把模型/YOLO/plan/context% 搬回顶栏。不要加默认队列右栏。
+
 | ID | 功能点 | TUI | Web 怎么做 | Web 已实现 |
 |---|---|---|---|---|
 | H-01 | Shortcuts bar | U-04 | 底 hint | 是：底 hint / `?` |
@@ -26,7 +28,7 @@
 | H-22 | Clipboard focus tip | | | 否（不做） |
 | H-23 | Ephemeral tips | 见即门控 | localStorage seen | 否（不做） |
 | H-24 | Welcome toast | | | 否（不做） |
-| H-25 | 复制成功 toast | Copied! | | 部分：复制成功改按钮文案 |
+| H-25 | 复制成功 toast | Copied! | | 部分：改按钮文案，不加 Copied toast |
 | H-26 | Reconnecting 提示 | 「Reconnecting, please wait...」禁发送 | 顶条 | 是：断线横幅 + 禁发送 |
 | H-27 | 版本不匹配横幅 | leader | toast 升级 grok | 否。**备注：版本不匹配 待讨论后再做。** |
 | H-28 | Privacy banner | | | 是：隐私横幅 |

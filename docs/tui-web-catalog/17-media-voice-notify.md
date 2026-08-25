@@ -17,11 +17,11 @@
 | M-13 | STT 语言 | G-41 | 同表 | 否。**备注：见上。** |
 | M-14 | 录音行 [stop] | | 按钮 | 否。**备注：见上。** |
 | M-15 | Esc 停录音 | steal-Esc | 同 | 否。**备注：见上。** |
-| M-16 | 桌面通知 | TurnComplete、ApprovalRequired、SessionReady、TaskComplete、AgentError | `Notification` API + 焦点时抑制 | 部分：权限卡去重通知。**备注：TurnComplete 桌面通知 {NOTE}。** |
+| M-16 | 桌面通知 | TurnComplete、ApprovalRequired、SessionReady、TaskComplete、AgentError | `Notification` API + 焦点时抑制 | 部分：hidden 时 TurnComplete 走 Notification（标题会话名，正文「回合已结束」）。本轮测试机 Chrome 管理员锁 Block，未见到系统 toast。不做页内 toast。 |
 | M-17 | 通知方法/协议 | OSC / 终端 / tmux / hook 命令 | 只用 Web Notification + 可选 hook（Agent 侧） | 是：只用 Web Notification，不走 OSC |
 | M-18 | 仅失焦通知 | `only_unfocused`；focus tracker | `document.hidden` | 否。**备注：仅失焦通知 待讨论后再做。** |
 | M-19 | 权限通知去重 | 一批一次 | 同 | 是：权限通知去重（B-17） |
-| M-20 | 窗口标题 | TitleManager 会话名/状态 | `document.title` | 部分：标题用会话名。**备注：状态写入 title {NOTE}。** |
+| M-20 | 窗口标题 | TitleManager 会话名/状态 | `document.title` | 是：跑 turn 标题「运行中 · 会话名」，闲回会话名。 |
 | M-21 | OSC 9;4 进度 | Ghostty 进度条 5s keepalive | 不用 OSC；可用 `navigator.setAppBadge` | 否（N/A） |
 | M-22 | 抑制睡眠 | SleepInhibitor 跑 turn 时 | Wake Lock API | 否。**备注：Wake Lock 待讨论后再做。** |
 | M-23 | 通知 hook 命令 | 本机脚本 | 仍在 Agent/TUI 配置；Web 可不做 | Agent 已有 |

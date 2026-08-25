@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  TURN_COMPLETE_TITLE,
+  TURN_COMPLETE_BODY,
+  turnCompleteNotify,
   shouldNotifyTurnComplete,
   windowTitle,
 } from "./notify.ts";
@@ -71,6 +72,7 @@ test("shouldNotifyTurnComplete only when hidden and granted", () => {
   assert.equal(shouldNotifyTurnComplete({ hidden: false, permission: "default" }), false);
 });
 
-test("turn-complete notify copy is Grok 已完成", () => {
-  assert.equal(TURN_COMPLETE_TITLE, "Grok 已完成");
+test("turn-complete notify title is session name, body 回合已结束", () => {
+  assert.equal(TURN_COMPLETE_BODY, "回合已结束");
+  assert.deepEqual(turnCompleteNotify("my chat"), { title: "my chat", body: "回合已结束" });
 });

@@ -1,4 +1,8 @@
-export const TURN_COMPLETE_TITLE = "Grok 已完成";
+export const TURN_COMPLETE_BODY = "回合已结束";
+
+export function turnCompleteNotify(sessionName: string): { title: string; body: string } {
+  return { title: sessionName, body: TURN_COMPLETE_BODY };
+}
 
 export function windowTitle(input: {
   surface: string;

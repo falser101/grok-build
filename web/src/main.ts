@@ -219,8 +219,8 @@ import {
   type RosterEntry,
 } from "./dashboard";
 import {
-  TURN_COMPLETE_TITLE,
   shouldNotifyTurnComplete,
+  turnCompleteNotify,
   windowTitle,
 } from "./notify";
 /** Old Slice-0 default; treating it as unset so we don't pin the list to this repo. */
@@ -801,7 +801,8 @@ async function requestThenNotify() {
   }
   if (!shouldNotifyTurnComplete({ hidden: document.hidden, permission })) return;
   try {
-    new Notification(TURN_COMPLETE_TITLE, { body: sessionLabel.textContent ?? "" });
+    const copy = turnCompleteNotify(sessionLabel.textContent ?? "");
+    new Notification(copy.title, { body: copy.body });
   } catch {
     /* ignore */
   }

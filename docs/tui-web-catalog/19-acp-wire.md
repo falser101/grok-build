@@ -94,7 +94,7 @@ Web 客户端按方法接。TUI 已全部使用或可使用。标准方法见 [A
 
 DiffReview, RetryState, AutoCompact*, MemoryFlush*, MemoryDreamCompleted, MemorySessionSaved, AutoContinueCompleted, FeedbackRequest, RelaySyncStatus, AutoRecovery*, HookAnnotation, HookExecution, HooksChanged, PluginsChanged, PluginUpdatesInstalled, SessionStatus, SessionSummaryGenerated, SessionRecap, SessionRecapUnavailable, LastTurnSummary, TaskCompleted, SubagentSpawned/Progress/Finished, TaskBackgrounded, ScheduledTask*, MonitorEvent, ModelAutoSwitched, ModelChanged, ToolCallDeltaChunk, ImageCompressed, ImageDropped, MemoryFiles, WorkflowUpdated, GoalUpdated, …
 
-每条对应 C-/X-/M-/E- 行，Web 未处理的 tag 应打进「未实现更新」日志，不要丢崩。
+每条对应 C-/X-/M-/E- 行。未知 sessionUpdate 打 console.debug「未实现更新 <tag>」，不进时间线、不 toast。本轮实测：正常回合会打 response_completed；注入 goal_updated 同样只进日志。不要为此接 UI。
 
 ## session/new `_meta` 常用
 

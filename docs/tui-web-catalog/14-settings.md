@@ -1,6 +1,6 @@
 # 14 `/settings` 全量项
 
-来源：`settings/defs.rs` `default_settings()`。Web 设置页按同一 key 分组。改 SHELL/SHARED 的应经 Agent 持久化到 `config.toml`；PAGER 会话级可只留前端。
+来源：`settings/defs.rs` `default_settings()`。Web 设置仍是居中弹层，左侧六栏：外观、编辑、权限、工作目录、Skills、MCP。前四栏还是原开关，不加新的。改 SHELL/SHARED 的应经 Agent 持久化到 `config.toml`；PAGER 会话级可只留前端。
 
 | ID | key | 分类 | TUI | Web 怎么做 | Web 已实现 |
 |---|---|---|---|---|---|
@@ -55,6 +55,6 @@
 | G-49 | fork_secondary_model | Models | fork 用副模型 | 下拉 | 否。**备注：fork 副模型 待讨论后再做。** |
 | G-50 | 设置搜索 | 关键字过滤 | 同 | 否。**备注：设置搜索 待讨论后再做。** |
 | G-51 | 设置 preview | theme 等 supports_preview 逐键预览，Enter 提交 | 同 | 部分：主题即时生效。**备注：逐键 preview 协议 {NOTE}。** |
-| G-52 | 设置分类 | Appearance Editor Mouse Agent Models Privacy Advanced | 同 IA | 是：现网设置模态分组外观 / 编辑 / 权限 / 工作目录。没造隐私组。没设置搜索。 |
+| G-52 | 设置分类 | Appearance Editor Mouse Agent Models Privacy Advanced | 同 IA | 是：弹层左侧六栏 外观 / 编辑 / 权限 / 工作目录 / Skills / MCP。前四栏原开关。没造隐私组。没设置搜索。 |
 | G-53 | Minimal 藏行 | hidden_in_minimal | Web 用 N/A 列藏 | 否（N/A） |
 | G-54 | persist 失败 toast | 写 toml 错 | 展示错误 | 是：失败横幅 |

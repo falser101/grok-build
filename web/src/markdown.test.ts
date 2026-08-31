@@ -43,6 +43,16 @@ test("renders headings code tables tasks and links", () => {
 test("mermaid fence stays a mermaid-block", () => {
   const html = renderMarkdown("```mermaid\ngraph TD; A-->B\n```");
   assert.match(html, /mermaid-block/);
+  assert.equal(html.includes("md-code-copy"), false);
+});
+
+test("code fence has lang id and 复制, not Copy code", () => {
+  const html = renderMarkdown("```python\nprint(1)\n```");
+  assert.match(html, /class="md-code"/);
+  assert.match(html, /class="md-code-lang">python<\/span>/);
+  assert.match(html, /class="md-code-copy">复制<\/button>/);
+  assert.match(html, /class="language-python"/);
+  assert.equal(html.includes("Copy code"), false);
 });
 
 test("rejects javascript: links", () => {

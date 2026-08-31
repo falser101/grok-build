@@ -160,7 +160,8 @@ function fenceHtml(lang: string, code: string): string {
   if (lang === "mermaid") {
     return `<pre class="mermaid-block">${escapeHtml(code)}</pre>`;
   }
-  return `<pre><code${lang ? ` class="language-${lang}"` : ""}>${highlightCode(code, lang)}</code></pre>`;
+  const langLabel = lang ? escapeHtml(lang) : "";
+  return `<div class="md-code"><div class="md-code-bar"><span class="md-code-lang">${langLabel}</span><button type="button" class="md-code-copy">复制</button></div><pre><code${lang ? ` class="language-${lang}"` : ""}>${highlightCode(code, lang)}</code></pre></div>`;
 }
 
 type ParsedFence = { lang: string; code: string; closed: boolean };

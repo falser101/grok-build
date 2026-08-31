@@ -100,26 +100,42 @@ export function patchTimelineItem(
   if (el.classList.contains("turn-user")) syncUserThumbs(el, item, handlers);
 }
 
-function wantsReplyFeedback(item: TimelineItem): boolean {
+function wantsReplyCopy(item: TimelineItem): boolean {
   return item.kind === "agent" && Boolean((item.text || item.raw || "").trim());
 }
 
-function replyFeedbackState(item: TimelineItem): "pending" | "reasons" | "sent" {
-  if (item.feedback === "sent" || item.status === "sent") return "sent";
-  if (item.feedback === "reasons") return "reasons";
-  return "pending";
+function wireCodeCopy(el: HTMLElement) {
+  if (el.dataset.codeCopy === "1") return;
+  el.dataset.codeCopy = "1";
+  el.addEventListener("click", (ev) => {
+    const btn = (ev.target as HTMLElement | null)?.closest?.(".md-code-copy");
+    if (!btn || !el.contains(btn)) return;
+    ev.stopPropagation();
+    const pre = btn.closest(".md-code")?.querySelector("pre");
+    const text = pre?.textContent ?? "";
+    void navigator.clipboard.writeText(text);
+  });
 }
 
-function ensureReplyFeedback(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers): boolean {
-  if (!wantsReplyFeedback(item)) return true;
-  const want = replyFeedbackState(item);
-  const existing = el.querySelector(":scope > .feedback-block") as HTMLElement | null;
-  if (existing) {
-    if (existing.dataset.state === want) return true;
-    existing.remove();
+function ensureReplyCopy(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers): boolean {
+  wireCodeCopy(el);
+  el.querySelector(":scope > .feedback-block")?.remove();
+  if (!wantsReplyCopy(item)) {
+    el.querySelector(":scope > .reply-copy")?.remove();
+    return true;
   }
-  if (!item.feedback) item.feedback = "pending";
-  el.append(feedbackActions(item, handlers, () => fill(el, item, handlers)));
+  let btn = el.querySelector(":scope > .reply-copy") as HTMLButtonElement | null;
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "reply-copy";
+    btn.textContent = "复制";
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      handlers.onCopy(item);
+    });
+    el.append(btn);
+  }
   return true;
 }
 
@@ -131,15 +147,16 @@ function patchStreamingBody(el: HTMLElement, item: TimelineItem, handlers: ItemH
   if (item.kind === "think") {
     (el as HTMLDetailsElement).open = item.open !== false;
     applyMarkdownStream(body, item.text);
+    wireCodeCopy(el);
     return true;
   }
   if (item.kind === "agent" && el.dataset.raw === "1") {
     const pre = body.querySelector("pre") ?? body;
     pre.textContent = item.raw;
-    return ensureReplyFeedback(el, item, handlers);
+    return ensureReplyCopy(el, item, handlers);
   }
   applyMarkdownStream(body, item.text);
-  return ensureReplyFeedback(el, item, handlers);
+  return ensureReplyCopy(el, item, handlers);
 }
 
 function fill(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
@@ -163,6 +180,7 @@ function fill(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
       if (details.open === Boolean(item.open !== false)) return;
       handlers.onToggle(item);
     });
+    wireCodeCopy(el);
     return;
   }
   if (item.kind === "tool") {
@@ -275,11 +293,9 @@ function fill(el: HTMLElement, item: TimelineItem, handlers: ItemHandlers) {
       handlers.onDismissBtw?.(item);
     });
     el.append(close);
+    wireCodeCopy(el);
   }
-  if (wantsReplyFeedback(item)) {
-    if (!item.feedback) item.feedback = "pending";
-    el.append(feedbackActions(item, handlers, () => fill(el, item, handlers)));
-  }
+  if (item.kind === "agent") ensureReplyCopy(el, item, handlers);
 }
 
 function fillUserThumbs(

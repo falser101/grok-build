@@ -37,6 +37,7 @@ html[data-theme="dark"] {
   --radius: 10px;
   --sidebar-width: 260px;
   --column: min(72rem, 100%);
+  --read-column: min(48rem, 100%);
   --gutter: 1.25rem;
   --rail-slot: 0px;
 }
@@ -960,17 +961,25 @@ button:disabled {
 .thread {
   width: 100%;
   margin: 0;
-  padding: 1.1rem 0 1.6rem;
+  padding: 1.4rem 0 2rem;
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: none;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.75rem;
   align-items: stretch;
   min-height: 0;
   min-width: 0;
   height: 100%;
+}
+
+#thread > .bubble,
+#thread > .turn-user {
+  width: var(--read-column);
+  max-width: calc(100% - 2 * var(--gutter));
+  margin-inline: auto;
+  box-sizing: border-box;
 }
 
 .thread::-webkit-scrollbar {
@@ -1023,9 +1032,9 @@ button:disabled {
   overflow: hidden;
   background: var(--bubble-user);
   color: var(--bubble-user-ink);
-  padding: 0.55rem 0.75rem 0.6rem;
-  border: 1px solid var(--bubble-user-line);
-  border-radius: 18px 18px 6px 18px;
+  padding: 0.7rem 1rem 0.75rem;
+  border: 0;
+  border-radius: 22px;
 }
 
 .bubble.user[hidden] {
@@ -2253,7 +2262,7 @@ code {
 
 .bubble.agent .body p,
 .bubble.think .body p {
-  margin: 0.45rem 0;
+  margin: 0.75rem 0;
 }
 
 .bubble.agent .body > p:first-child,
@@ -2327,6 +2336,62 @@ code {
   font-size: 0.8rem;
   tab-size: 4;
   white-space: pre-wrap;
+}
+
+.md-code {
+  margin: 0.9rem 0;
+  overflow: hidden;
+  background: var(--bg-2);
+  border-radius: 8px;
+}
+
+.md-code-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.75rem 0.15rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.md-code-lang {
+  font-family: var(--mono);
+}
+
+.md-code-copy,
+.reply-copy {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.md-code-copy {
+  font-size: 0.75rem;
+}
+
+.reply-copy {
+  margin-top: 0.9rem;
+}
+
+.bubble.agent .body .md-code pre,
+.bubble.think .body .md-code pre,
+.bubble.btw .body .md-code pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.45rem 0.75rem 0.75rem;
+}
+
+.md-code-copy:hover,
+.reply-copy:hover {
+  color: var(--ink);
 }
 
 .md-table {
@@ -3008,7 +3073,7 @@ label.check .check-hint {
 }
 
 .bubble.agent > .feedback-block {
-  display: flex;
+  display: none;
 }
 
 .feedback-actions {
